@@ -11,7 +11,7 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
 <style>
 :root {
   --bg: #1a1a2e;
@@ -27,135 +27,105 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  min-height: 100dvh;
-  overflow-x: hidden;
-  -webkit-tap-highlight-color: transparent;
+  background: var(--bg); color: var(--text);
+  min-height: 100vh; min-height: 100dvh;
+  overflow-x: hidden; -webkit-tap-highlight-color: transparent;
 }
 .app { max-width: 600px; margin: 0 auto; padding: 12px; padding-bottom: 100px; }
-
-/* Header */
-.header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 0; margin-bottom: 8px;
-}
+.header { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; margin-bottom: 8px; }
 .header h1 { font-size: 20px; font-weight: 700; }
 .header-actions { display: flex; gap: 8px; }
 .icon-btn {
   width: 40px; height: 40px; border-radius: 50%; border: none;
   background: var(--surface); color: var(--text); font-size: 18px;
   display: flex; align-items: center; justify-content: center; cursor: pointer;
-  transition: background 0.2s;
 }
 .icon-btn:active { background: var(--surface2); }
-
-/* Stats bar */
-.stats {
-  display: flex; gap: 8px; margin-bottom: 12px;
-}
-.stat-card {
-  flex: 1; background: var(--surface); border-radius: var(--radius);
-  padding: 10px; text-align: center;
-}
+.stats { display: flex; gap: 8px; margin-bottom: 12px; }
+.stat-card { flex: 1; background: var(--surface); border-radius: var(--radius); padding: 10px; text-align: center; }
 .stat-num { font-size: 24px; font-weight: 700; }
 .stat-label { font-size: 11px; color: var(--text2); margin-top: 2px; }
 .stat-card.scanned .stat-num { color: var(--green); }
 .stat-card.remaining .stat-num { color: var(--accent); }
-
-/* Upload area */
 .upload-area {
-  border: 2px dashed var(--surface2);
-  border-radius: var(--radius);
-  padding: 40px 20px;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.3s, background 0.3s;
-  margin-bottom: 12px;
+  border: 2px dashed var(--surface2); border-radius: var(--radius);
+  padding: 40px 20px; text-align: center; cursor: pointer;
+  transition: border-color 0.3s, background 0.3s; margin-bottom: 12px;
 }
-.upload-area:active, .upload-area.dragover {
-  border-color: var(--accent);
-  background: rgba(233, 69, 96, 0.1);
-}
+.upload-area:active, .upload-area.dragover { border-color: var(--accent); background: rgba(233,69,96,0.1); }
 .upload-icon { font-size: 48px; margin-bottom: 12px; }
 .upload-text { color: var(--text2); font-size: 14px; }
 .upload-text strong { color: var(--text); }
 input[type="file"] { display: none; }
-
-/* Scan button */
 .scan-btn {
   position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-  width: calc(100% - 24px); max-width: 576px;
-  padding: 16px; border: none; border-radius: var(--radius);
-  background: var(--accent); color: white;
+  width: calc(100% - 24px); max-width: 576px; padding: 16px; border: none;
+  border-radius: var(--radius); background: var(--accent); color: white;
   font-size: 18px; font-weight: 700; cursor: pointer;
   display: flex; align-items: center; justify-content: center; gap: 10px;
-  z-index: 100; box-shadow: 0 4px 20px rgba(233, 69, 96, 0.4);
-  transition: transform 0.1s, opacity 0.3s;
+  z-index: 100; box-shadow: 0 4px 20px rgba(233,69,96,0.4);
 }
 .scan-btn:active { transform: translateX(-50%) scale(0.97); }
 .scan-btn:disabled { opacity: 0.5; }
 .scan-btn svg { width: 24px; height: 24px; }
 
-/* Scanner overlay */
-.scanner-overlay {
-  position: fixed; inset: 0; background: #000; z-index: 1000;
-  display: none; flex-direction: column;
-}
+/* Scanner */
+.scanner-overlay { position: fixed; inset: 0; background: #000; z-index: 1000; display: none; flex-direction: column; }
 .scanner-overlay.active { display: flex; }
 .scanner-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 16px; background: rgba(0,0,0,0.8); z-index: 10;
 }
 .scanner-header h2 { font-size: 16px; color: white; }
+.scanner-header-btns { display: flex; gap: 8px; }
 .scanner-close {
   width: 36px; height: 36px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3);
-  background: transparent; color: white; font-size: 20px; cursor: pointer;
+  background: transparent; color: white; font-size: 18px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
 }
-#scanner-container { flex: 1; position: relative; overflow: hidden; background: #000; }
-#scannerVideo { width: 100%; height: 100%; object-fit: cover; }
-.scan-region-highlight {
-  position: absolute; top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  width: 85%; height: 120px; max-height: 25%;
-  border: 2px solid var(--accent);
-  border-radius: 8px;
-  pointer-events: none;
-  box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);
+.scanner-body { flex: 1; position: relative; overflow: hidden; background: #000; }
+#quaggaContainer { width: 100%; height: 100%; }
+#quaggaContainer video { width: 100% !important; height: 100% !important; object-fit: cover !important; position: absolute; top: 0; left: 0; }
+#quaggaContainer canvas { display: none !important; }
+#quaggaContainer canvas.drawingBuffer { display: none !important; }
+.scan-frame {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  width: 85%; height: 100px; border: 2px solid var(--accent); border-radius: 8px;
+  pointer-events: none; box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);
 }
-.scan-line {
-  position: absolute; top: 0; left: 0; right: 0;
-  height: 2px; background: var(--accent);
-  animation: scanMove 2s ease-in-out infinite;
+.scan-frame::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--accent); animation: scanLine 2s ease-in-out infinite;
   box-shadow: 0 0 8px var(--accent);
 }
-@keyframes scanMove { 0%,100%{top:0} 50%{top:100%} }
-.manual-input {
+@keyframes scanLine { 0%,100%{top:0} 50%{top:calc(100% - 2px)} }
+.scanner-bottom {
+  padding: 12px 16px; background: rgba(0,0,0,0.8); z-index: 10;
+  display: flex; gap: 8px; align-items: center;
+}
+.scanner-bottom input {
+  flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.1); color: white; font-size: 16px;
+}
+.scanner-bottom input::placeholder { color: rgba(255,255,255,0.4); }
+.scanner-bottom button {
+  padding: 10px 16px; border-radius: 8px; border: none;
+  background: var(--accent); color: white; font-weight: 700; font-size: 14px; cursor: pointer;
+  white-space: nowrap;
+}
+#photoInput { display: none; }
+.debug-info {
   position: absolute; bottom: 80px; left: 12px; right: 12px;
-  display: flex; gap: 8px; z-index: 10;
+  color: rgba(255,255,255,0.6); font-size: 11px; text-align: center;
+  pointer-events: none; z-index: 5;
 }
-.manual-input input {
-  flex: 1; padding: 12px; border-radius: 8px; border: none;
-  background: var(--surface); color: var(--text); font-size: 16px;
-}
-.manual-input button {
-  padding: 12px 20px; border-radius: 8px; border: none;
-  background: var(--accent); color: white; font-weight: 700; font-size: 16px;
-  cursor: pointer;
-}
-/* Legacy html5-qrcode elements (hidden, used as fallback container) */
-#html5qr-container { position: absolute; inset: 0; display: none; }
-#html5qr-container video { width: 100% !important; height: 100% !important; object-fit: cover !important; }
 
 /* Result toast */
 .result-toast {
   position: fixed; bottom: 0; left: 0; right: 0;
   padding: 20px 16px; padding-bottom: max(20px, env(safe-area-inset-bottom));
   z-index: 1001; transform: translateY(100%);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  text-align: center;
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); text-align: center;
 }
 .result-toast.show { transform: translateY(0); }
 .result-toast.success { background: linear-gradient(to top, rgba(0,200,83,0.95), rgba(0,200,83,0.85)); }
@@ -163,31 +133,29 @@ input[type="file"] { display: none; }
 .result-toast .result-number { font-size: 48px; font-weight: 800; }
 .result-toast .result-name { font-size: 16px; font-weight: 600; margin-top: 4px; }
 .result-toast .result-code { font-size: 12px; opacity: 0.8; margin-top: 4px; }
-.result-toast .result-already { font-size: 13px; opacity: 0.9; margin-top: 6px; font-style: italic; }
+.result-toast .result-extra { font-size: 13px; opacity: 0.9; margin-top: 6px; font-style: italic; }
 
-/* Table */
-.table-section { margin-top: 12px; }
+/* Table, search, tabs */
+.table-info { background: var(--surface); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; }
+.table-info .ti-name { font-weight: 600; font-size: 14px; }
+.table-info .ti-meta { font-size: 12px; color: var(--text2); margin-top: 4px; }
+.tab-bar { display: flex; gap: 4px; margin-bottom: 12px; background: var(--surface); border-radius: var(--radius); padding: 4px; }
+.tab-btn { flex: 1; padding: 8px; border: none; border-radius: 8px; background: transparent; color: var(--text2); font-size: 13px; font-weight: 600; cursor: pointer; }
+.tab-btn.active { background: var(--accent); color: white; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
 .search-bar {
   width: 100%; padding: 10px 14px; border-radius: var(--radius);
   border: 1px solid var(--surface2); background: var(--surface);
-  color: var(--text); font-size: 14px; margin-bottom: 10px;
-  outline: none;
+  color: var(--text); font-size: 14px; margin-bottom: 10px; outline: none;
 }
 .search-bar:focus { border-color: var(--accent); }
-.table-wrap {
-  border-radius: var(--radius); overflow: hidden;
-  background: var(--surface);
-}
-.item-row {
-  display: flex; align-items: center; padding: 10px 12px;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-  transition: background 0.3s;
-  gap: 10px;
-}
-.item-row.scanned { background: rgba(0, 200, 83, 0.15); }
+.table-wrap { border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+.item-row { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); gap: 10px; }
+.item-row.scanned { background: rgba(0,200,83,0.15); }
 .item-row .item-num {
-  width: 32px; height: 32px; border-radius: 50%;
-  background: var(--surface2); display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 50%; background: var(--surface2);
+  display: flex; align-items: center; justify-content: center;
   font-size: 12px; font-weight: 700; flex-shrink: 0;
 }
 .item-row.scanned .item-num { background: var(--green); color: #000; }
@@ -196,12 +164,20 @@ input[type="file"] { display: none; }
 .item-code { font-size: 11px; color: var(--text2); margin-top: 2px; }
 .item-loc { font-size: 11px; color: var(--accent); }
 .item-check { font-size: 20px; flex-shrink: 0; }
+.history-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--surface); border-radius: 8px; margin-bottom: 4px; font-size: 13px; }
+.history-item .hi-time { color: var(--text2); font-size: 11px; flex-shrink: 0; }
+.history-item .hi-name { flex: 1; }
+.history-item.hi-err { border-left: 3px solid var(--red); }
+.history-item.hi-ok { border-left: 3px solid var(--green); }
+.empty-state { text-align: center; padding: 30px; color: var(--text2); }
+.empty-state .empty-icon { font-size: 40px; margin-bottom: 10px; }
+.sync-status { font-size: 11px; color: var(--text2); text-align: center; margin-top: 8px; padding: 6px; }
+.sync-status.syncing { color: #ffb300; }
+.sync-status.synced { color: var(--green); }
+.sync-status.error { color: var(--red); }
 
-/* Settings panel */
-.settings-panel {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
-  z-index: 500; display: none; align-items: flex-end; justify-content: center;
-}
+/* Settings */
+.settings-panel { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 500; display: none; align-items: flex-end; justify-content: center; }
 .settings-panel.active { display: flex; }
 .settings-content {
   background: var(--surface); border-radius: var(--radius) var(--radius) 0 0;
@@ -213,1162 +189,563 @@ input[type="file"] { display: none; }
 .setting-group { margin-bottom: 16px; }
 .setting-group label { display: block; font-size: 13px; color: var(--text2); margin-bottom: 6px; }
 .setting-group input, .setting-group select {
-  width: 100%; padding: 10px; border-radius: 8px;
-  border: 1px solid var(--surface2); background: var(--bg);
-  color: var(--text); font-size: 14px;
+  width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--surface2);
+  background: var(--bg); color: var(--text); font-size: 14px;
 }
 .setting-group input:focus { border-color: var(--accent); outline: none; }
 .settings-actions { display: flex; gap: 10px; margin-top: 16px; }
-.btn {
-  flex: 1; padding: 12px; border: none; border-radius: 8px;
-  font-size: 14px; font-weight: 600; cursor: pointer;
-}
+.btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
 .btn-primary { background: var(--accent); color: white; }
 .btn-secondary { background: var(--surface2); color: var(--text); }
 .btn-danger { background: var(--red); color: white; }
-
-/* Scan history */
-.history-section { margin-top: 16px; }
-.history-section h3 { font-size: 14px; color: var(--text2); margin-bottom: 8px; }
-.history-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 12px; background: var(--surface);
-  border-radius: 8px; margin-bottom: 4px; font-size: 13px;
-}
-.history-item .hi-time { color: var(--text2); font-size: 11px; flex-shrink: 0; }
-.history-item .hi-name { flex: 1; }
-.history-item.hi-err { border-left: 3px solid var(--red); }
-.history-item.hi-ok { border-left: 3px solid var(--green); }
-
-/* Loading */
-.loading { text-align: center; padding: 40px; color: var(--text2); }
-
-/* Table info */
-.table-info {
-  background: var(--surface); border-radius: var(--radius);
-  padding: 12px; margin-bottom: 12px;
-}
-.table-info .ti-name { font-weight: 600; font-size: 14px; }
-.table-info .ti-meta { font-size: 12px; color: var(--text2); margin-top: 4px; }
-
-/* Vibrate for iOS sound unlock */
-.sound-unlock {
-  position: fixed; inset: 0; z-index: 2000;
-  background: rgba(0,0,0,0.8); display: none;
-  align-items: center; justify-content: center;
-}
-.sound-unlock.active { display: flex; }
-.sound-unlock-btn {
-  padding: 20px 40px; border: none; border-radius: var(--radius);
-  background: var(--accent); color: white; font-size: 18px;
-  font-weight: 700; cursor: pointer;
-}
-
-/* Tabs */
-.tab-bar {
-  display: flex; gap: 4px; margin-bottom: 12px;
-  background: var(--surface); border-radius: var(--radius); padding: 4px;
-}
-.tab-btn {
-  flex: 1; padding: 8px; border: none; border-radius: 8px;
-  background: transparent; color: var(--text2); font-size: 13px;
-  font-weight: 600; cursor: pointer; transition: all 0.2s;
-}
-.tab-btn.active { background: var(--accent); color: white; }
-.tab-content { display: none; }
-.tab-content.active { display: block; }
-
-/* Sync status */
-.sync-status {
-  font-size: 11px; color: var(--text2); text-align: center;
-  margin-top: 8px; padding: 6px;
-}
-.sync-status.syncing { color: #ffb300; }
-.sync-status.synced { color: var(--green); }
-.sync-status.error { color: var(--red); }
-
-/* Empty state */
-.empty-state { text-align: center; padding: 30px; color: var(--text2); }
-.empty-state .empty-icon { font-size: 40px; margin-bottom: 10px; }
 </style>
 </head>
 <body>
-
 <div class="app" id="app">
-  <!-- Sound unlock overlay (needed for iOS) -->
-  <div class="sound-unlock" id="soundUnlock">
-    <button class="sound-unlock-btn" onclick="unlockSound()">🔊 Включить звук</button>
-  </div>
-
-  <!-- Header -->
   <div class="header">
     <h1>📦 Склад Сканер</h1>
     <div class="header-actions">
-      <button class="icon-btn" onclick="showSettings()" title="Настройки">⚙️</button>
-      <button class="icon-btn" onclick="exportHistory()" title="Экспорт">📤</button>
+      <button class="icon-btn" onclick="showSettings()">⚙️</button>
+      <button class="icon-btn" onclick="exportHistory()">📤</button>
     </div>
   </div>
 
-  <!-- Upload area (shown when no table loaded) -->
   <div id="uploadSection">
     <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
       <div class="upload-icon">📋</div>
-      <div class="upload-text">
-        <strong>Загрузите Excel файл</strong><br>
-        Лист отбора с артикулами OZON
-      </div>
+      <div class="upload-text"><strong>Загрузите Excel файл</strong><br>Лист отбора с артикулами OZON</div>
     </div>
     <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
   </div>
 
-  <!-- Main content (shown after table loaded) -->
   <div id="mainSection" style="display:none;">
-    <!-- Table info -->
-    <div class="table-info" id="tableInfo">
-      <div class="ti-name" id="tableName"></div>
-      <div class="ti-meta" id="tableMeta"></div>
-    </div>
-
-    <!-- Stats -->
+    <div class="table-info"><div class="ti-name" id="tableName"></div><div class="ti-meta" id="tableMeta"></div></div>
     <div class="stats">
-      <div class="stat-card">
-        <div class="stat-num" id="totalCount">0</div>
-        <div class="stat-label">Всего</div>
-      </div>
-      <div class="stat-card scanned">
-        <div class="stat-num" id="scannedCount">0</div>
-        <div class="stat-label">Собрано</div>
-      </div>
-      <div class="stat-card remaining">
-        <div class="stat-num" id="remainingCount">0</div>
-        <div class="stat-label">Осталось</div>
-      </div>
+      <div class="stat-card"><div class="stat-num" id="totalCount">0</div><div class="stat-label">Всего</div></div>
+      <div class="stat-card scanned"><div class="stat-num" id="scannedCount">0</div><div class="stat-label">Собрано</div></div>
+      <div class="stat-card remaining"><div class="stat-num" id="remainingCount">0</div><div class="stat-label">Осталось</div></div>
     </div>
-
-    <!-- Tabs -->
     <div class="tab-bar">
       <button class="tab-btn active" data-tab="table" onclick="switchTab('table')">Таблица</button>
       <button class="tab-btn" data-tab="history" onclick="switchTab('history')">История</button>
     </div>
-
-    <!-- Table tab -->
     <div class="tab-content active" id="tab-table">
       <input type="text" class="search-bar" id="searchBar" placeholder="🔍 Поиск по названию, коду или месту...">
       <div class="table-wrap" id="tableBody"></div>
     </div>
-
-    <!-- History tab -->
     <div class="tab-content" id="tab-history">
-      <div id="historyList">
-        <div class="empty-state">
-          <div class="empty-icon">📭</div>
-          <div>Пока нет сканирований</div>
-        </div>
-      </div>
+      <div id="historyList"><div class="empty-state"><div class="empty-icon">📭</div><div>Пока нет сканирований</div></div></div>
     </div>
-
     <div class="sync-status" id="syncStatus"></div>
-
-    <!-- New table button -->
-    <div style="margin-top: 16px; text-align: center;">
-      <button class="btn btn-secondary" onclick="loadNewTable()" style="width: auto; padding: 10px 20px;">
-        📋 Загрузить другую таблицу
-      </button>
+    <div style="margin-top:16px;text-align:center;">
+      <button class="btn btn-secondary" onclick="loadNewTable()" style="width:auto;padding:10px 20px;">📋 Загрузить другую таблицу</button>
     </div>
   </div>
 
-  <!-- Scan button -->
   <button class="scan-btn" id="scanBtn" onclick="startScanner()" disabled>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M1 4V1h3M20 1h3v3M1 20v3h3M20 23h3v-3"/>
-      <line x1="1" y1="12" x2="23" y2="12"/>
-    </svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4V1h3M20 1h3v3M1 20v3h3M20 23h3v-3"/><line x1="1" y1="12" x2="23" y2="12"/></svg>
     Сканировать
   </button>
 </div>
 
-<!-- Scanner overlay -->
+<!-- Scanner -->
 <div class="scanner-overlay" id="scannerOverlay">
   <div class="scanner-header">
-    <h2>Сканирование</h2>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <button class="scanner-close" onclick="showManualInput()" title="Ввести вручную" style="font-size:15px;">⌨️</button>
+    <h2 id="scannerTitle">Сканирование</h2>
+    <div class="scanner-header-btns">
       <button class="scanner-close" onclick="stopScanner()">✕</button>
     </div>
   </div>
-  <div id="scanner-container">
-    <video id="scannerVideo" autoplay playsinline webkit-playsinline muted></video>
-    <div class="scan-region-highlight">
-      <div class="scan-line"></div>
-    </div>
+  <div class="scanner-body" id="scannerBody">
+    <div id="quaggaContainer"></div>
+    <div class="scan-frame"></div>
+    <div class="debug-info" id="debugInfo"></div>
   </div>
-  <div class="manual-input" id="manualInput" style="display:none;">
-    <input type="text" id="manualCode" placeholder="Введите код (напр. OZN1831310669)" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+  <div class="scanner-bottom">
+    <input type="text" id="manualCode" placeholder="Или введите код вручную..." autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
     <button onclick="submitManualCode()">OK</button>
+    <label class="scanner-close" style="border-style:solid;cursor:pointer;font-size:15px;" title="Сфотографировать">
+      📷
+      <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none;">
+    </label>
   </div>
   <div class="result-toast" id="resultToast">
     <div class="result-number" id="resultNumber"></div>
     <div class="result-name" id="resultName"></div>
     <div class="result-code" id="resultCode"></div>
-    <div class="result-already" id="resultAlready"></div>
+    <div class="result-extra" id="resultExtra"></div>
   </div>
 </div>
 
-<!-- Settings panel -->
+<!-- Settings -->
 <div class="settings-panel" id="settingsPanel" onclick="if(event.target===this)hideSettings()">
   <div class="settings-content">
     <h3>⚙️ Настройки</h3>
-    <div class="setting-group">
-      <label>Имя устройства (для идентификации)</label>
-      <input type="text" id="deviceName" placeholder="Например: Телефон Петрова">
-    </div>
-    <div class="setting-group">
-      <label>URL Google Apps Script (для синхронизации)</label>
-      <input type="url" id="gasUrl" placeholder="https://script.google.com/macros/s/...">
-    </div>
-    <div class="setting-group">
-      <label>Вибрация при сканировании</label>
-      <select id="vibrationEnabled">
-        <option value="1">Включена</option>
-        <option value="0">Выключена</option>
-      </select>
-    </div>
+    <div class="setting-group"><label>Имя устройства</label><input type="text" id="deviceName" placeholder="Например: Телефон Петрова"></div>
+    <div class="setting-group"><label>URL Google Apps Script</label><input type="url" id="gasUrl" placeholder="https://script.google.com/macros/s/..."></div>
+    <div class="setting-group"><label>Вибрация</label><select id="vibrationEnabled"><option value="1">Включена</option><option value="0">Выключена</option></select></div>
     <div class="settings-actions">
       <button class="btn btn-secondary" onclick="hideSettings()">Закрыть</button>
       <button class="btn btn-primary" onclick="saveSettings()">Сохранить</button>
     </div>
-    <div style="margin-top: 16px; border-top: 1px solid var(--surface2); padding-top: 16px;">
-      <button class="btn btn-danger" onclick="resetAll()" style="width: 100%;">🗑 Сбросить все данные</button>
+    <div style="margin-top:16px;border-top:1px solid var(--surface2);padding-top:16px;">
+      <button class="btn btn-danger" onclick="resetAll()" style="width:100%;">🗑 Сбросить все данные</button>
     </div>
   </div>
 </div>
 
 <script>
-// ===================== DATABASE (IndexedDB) =====================
-const DB_NAME = 'WarehouseScanner';
-const DB_VERSION = 2;
+// ========== IndexedDB ==========
+const DB_NAME = 'WarehouseScanner', DB_VER = 2;
 let db = null;
-
 function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (e) => {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, DB_VER);
+    r.onupgradeneeded = e => {
       const d = e.target.result;
-      if (!d.objectStoreNames.contains('tables')) {
-        d.createObjectStore('tables', { keyPath: 'id' });
-      }
-      if (!d.objectStoreNames.contains('items')) {
-        const store = d.createObjectStore('items', { keyPath: 'id' });
-        store.createIndex('tableId', 'tableId');
-        store.createIndex('code', 'code');
-      }
-      if (!d.objectStoreNames.contains('scans')) {
-        const store = d.createObjectStore('scans', { keyPath: 'id', autoIncrement: true });
-        store.createIndex('tableId', 'tableId');
-      }
-      if (!d.objectStoreNames.contains('settings')) {
-        d.createObjectStore('settings', { keyPath: 'key' });
-      }
+      if (!d.objectStoreNames.contains('tables')) d.createObjectStore('tables', {keyPath:'id'});
+      if (!d.objectStoreNames.contains('items')) { const s = d.createObjectStore('items', {keyPath:'id'}); s.createIndex('tableId','tableId'); s.createIndex('code','code'); }
+      if (!d.objectStoreNames.contains('scans')) { const s = d.createObjectStore('scans', {keyPath:'id',autoIncrement:true}); s.createIndex('tableId','tableId'); }
+      if (!d.objectStoreNames.contains('settings')) d.createObjectStore('settings', {keyPath:'key'});
     };
-    req.onsuccess = () => { db = req.result; resolve(db); };
-    req.onerror = () => reject(req.error);
+    r.onsuccess = () => { db = r.result; res(db); };
+    r.onerror = () => rej(r.error);
   });
 }
+function dbPut(s,d) { return new Promise((res,rej)=>{ const tx=db.transaction(s,'readwrite'); tx.objectStore(s).put(d); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); }); }
+function dbGet(s,k) { return new Promise((res,rej)=>{ const tx=db.transaction(s,'readonly'); const r=tx.objectStore(s).get(k); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+function dbGetAll(s) { return new Promise((res,rej)=>{ const tx=db.transaction(s,'readonly'); const r=tx.objectStore(s).getAll(); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+function dbGetByIndex(s,i,v) { return new Promise((res,rej)=>{ const tx=db.transaction(s,'readonly'); const r=tx.objectStore(s).index(i).getAll(v); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+function dbClear(s) { return new Promise((res,rej)=>{ const tx=db.transaction(s,'readwrite'); tx.objectStore(s).clear(); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); }); }
 
-function dbPut(store, data) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, 'readwrite');
-    tx.objectStore(store).put(data);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-function dbGet(store, key) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, 'readonly');
-    const req = tx.objectStore(store).get(key);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-function dbGetAll(store) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, 'readonly');
-    const req = tx.objectStore(store).getAll();
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-function dbGetByIndex(store, indexName, value) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, 'readonly');
-    const idx = tx.objectStore(store).index(indexName);
-    const req = idx.getAll(value);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-function dbClearStore(store) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, 'readwrite');
-    tx.objectStore(store).clear();
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-// ===================== SETTINGS =====================
-let settings = {
-  deviceName: '',
-  gasUrl: '',
-  vibration: true
-};
-
+// ========== Settings ==========
+let settings = { deviceName:'', gasUrl:'', vibration:true };
 async function loadSettings() {
   try {
-    const dn = await dbGet('settings', 'deviceName');
-    const gu = await dbGet('settings', 'gasUrl');
-    const vb = await dbGet('settings', 'vibration');
-    if (dn) settings.deviceName = dn.value;
-    if (gu) settings.gasUrl = gu.value;
-    if (vb !== undefined && vb !== null) settings.vibration = vb.value;
-  } catch(e) {}
-  document.getElementById('deviceName').value = settings.deviceName;
-  document.getElementById('gasUrl').value = settings.gasUrl;
-  document.getElementById('vibrationEnabled').value = settings.vibration ? '1' : '0';
+    const dn=await dbGet('settings','deviceName'), gu=await dbGet('settings','gasUrl'), vb=await dbGet('settings','vibration');
+    if(dn) settings.deviceName=dn.value; if(gu) settings.gasUrl=gu.value; if(vb!=null) settings.vibration=vb.value;
+  } catch(e){}
+  document.getElementById('deviceName').value=settings.deviceName;
+  document.getElementById('gasUrl').value=settings.gasUrl;
+  document.getElementById('vibrationEnabled').value=settings.vibration?'1':'0';
 }
-
 async function saveSettings() {
-  settings.deviceName = document.getElementById('deviceName').value.trim();
-  settings.gasUrl = document.getElementById('gasUrl').value.trim();
-  settings.vibration = document.getElementById('vibrationEnabled').value === '1';
-  await dbPut('settings', { key: 'deviceName', value: settings.deviceName });
-  await dbPut('settings', { key: 'gasUrl', value: settings.gasUrl });
-  await dbPut('settings', { key: 'vibration', value: settings.vibration });
+  settings.deviceName=document.getElementById('deviceName').value.trim();
+  settings.gasUrl=document.getElementById('gasUrl').value.trim();
+  settings.vibration=document.getElementById('vibrationEnabled').value==='1';
+  await dbPut('settings',{key:'deviceName',value:settings.deviceName});
+  await dbPut('settings',{key:'gasUrl',value:settings.gasUrl});
+  await dbPut('settings',{key:'vibration',value:settings.vibration});
   hideSettings();
 }
+function showSettings(){ document.getElementById('settingsPanel').classList.add('active'); }
+function hideSettings(){ document.getElementById('settingsPanel').classList.remove('active'); }
 
-function showSettings() { document.getElementById('settingsPanel').classList.add('active'); }
-function hideSettings() { document.getElementById('settingsPanel').classList.remove('active'); }
-
-// ===================== SOUND =====================
+// ========== Sound ==========
 let audioCtx = null;
-let soundUnlocked = false;
+function initAudio(){ if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume(); }
+function playTone(f,dur,type='sine',vol=0.3){ if(!audioCtx)return; try{ const o=audioCtx.createOscillator(),g=audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); o.type=type; o.frequency.value=f; g.gain.setValueAtTime(vol,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+dur); o.start(); o.stop(audioCtx.currentTime+dur); }catch(e){} }
+function playSuccess(){ playTone(880,.15,'sine',.4); setTimeout(()=>playTone(1108,.15,'sine',.4),100); setTimeout(()=>playTone(1320,.25,'sine',.4),200); }
+function playError(){ playTone(300,.3,'square',.3); setTimeout(()=>playTone(200,.4,'square',.3),200); }
+function playDuplicate(){ playTone(600,.1,'sine',.3); setTimeout(()=>playTone(600,.1,'sine',.3),200); }
 
-function initAudio() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
-  }
-}
+// ========== State ==========
+let currentTableId=null, items=[], scanHistory=[];
+let lastScannedCode='', lastScanTime=0;
 
-function playTone(frequency, duration, type = 'sine', volume = 0.3) {
-  if (!audioCtx) return;
-  try {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.type = type;
-    osc.frequency.value = frequency;
-    gain.gain.setValueAtTime(volume, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-    osc.start();
-    osc.stop(audioCtx.currentTime + duration);
-  } catch(e) {}
-}
-
-function playSuccess() {
-  playTone(880, 0.15, 'sine', 0.4);
-  setTimeout(() => playTone(1108, 0.15, 'sine', 0.4), 100);
-  setTimeout(() => playTone(1320, 0.25, 'sine', 0.4), 200);
-}
-
-function playError() {
-  playTone(300, 0.3, 'square', 0.3);
-  setTimeout(() => playTone(200, 0.4, 'square', 0.3), 200);
-}
-
-function playDuplicate() {
-  playTone(600, 0.1, 'sine', 0.3);
-  setTimeout(() => playTone(600, 0.1, 'sine', 0.3), 200);
-}
-
-function unlockSound() {
-  initAudio();
-  playTone(1, 0.01, 'sine', 0.01);
-  soundUnlocked = true;
-  document.getElementById('soundUnlock').classList.remove('active');
-}
-
-// ===================== STATE =====================
-let currentTableId = null;
-let items = [];
-let scannedSet = new Set();
-let scanHistory = [];
-let scanner = null;
-let isScanning = false;
-let lastScannedCode = '';
-let lastScanTime = 0;
-
-// ===================== EXCEL PARSING =====================
+// ========== Excel Parsing ==========
 function parseExcel(data, fileName) {
-  const wb = XLSX.read(data, { type: 'array' });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-
-  // Find header row with "Артикул" or "Код OZON"
-  let headerRow = -1;
-  let colNum = -1, colOrder = -1, colCode = -1, colName = -1, colPlace = -1, colQty = -1;
-
-  for (let i = 0; i < Math.min(json.length, 10); i++) {
-    const row = json[i].map(c => String(c).toLowerCase());
-    for (let j = 0; j < row.length; j++) {
-      if (row[j].includes('артикул') || row[j].includes('код ozon') || row[j].includes('код_ozon')) {
-        headerRow = i;
-        colCode = j;
-        break;
-      }
+  const wb=XLSX.read(data,{type:'array'}), ws=wb.Sheets[wb.SheetNames[0]];
+  const json=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  let headerRow=-1, colNum=-1, colOrder=-1, colCode=-1, colName=-1, colPlace=-1, colQty=-1;
+  for(let i=0;i<Math.min(json.length,10);i++){
+    const row=json[i].map(c=>String(c).toLowerCase());
+    for(let j=0;j<row.length;j++){
+      if(row[j].includes('артикул')||row[j].includes('код ozon')){headerRow=i;colCode=j;break;}
     }
-    if (headerRow >= 0) break;
+    if(headerRow>=0)break;
   }
-
-  if (headerRow < 0) {
-    alert('Не найден столбец "Артикул/Код OZON" в файле');
-    return null;
+  if(headerRow<0){alert('Не найден столбец Артикул/Код OZON');return null;}
+  const hdr=json[headerRow].map(c=>String(c).toLowerCase());
+  for(let j=0;j<hdr.length;j++){
+    if(hdr[j]==='№'||hdr[j]==='no')colNum=j;
+    if(hdr[j].includes('номер заказа'))colOrder=j;
+    if(hdr[j].includes('наименование'))colName=j;
+    if(hdr[j].includes('место'))colPlace=j;
+    if(hdr[j].includes('кол'))colQty=j;
   }
-
-  // Identify other columns
-  const hdr = json[headerRow].map(c => String(c).toLowerCase());
-  for (let j = 0; j < hdr.length; j++) {
-    if (hdr[j] === '№' || hdr[j] === 'no' || hdr[j] === 'п/п') colNum = j;
-    if (hdr[j].includes('номер заказа') || hdr[j].includes('заказ')) colOrder = j;
-    if (hdr[j].includes('наименование')) colName = j;
-    if (hdr[j].includes('место')) colPlace = j;
-    if (hdr[j].includes('кол')) colQty = j;
+  if(colNum<0)colNum=0; if(colName<0)colName=colCode+1;
+  const parsed=[];
+  for(let i=headerRow+1;i<json.length;i++){
+    const row=json[i];
+    const code=String(row[colCode]||'').trim(), num=String(row[colNum]||'').trim();
+    const name=String(row[colName]||'').trim();
+    const place=colPlace>=0?String(row[colPlace]||'').trim():'';
+    const qty=colQty>=0?String(row[colQty]||'').trim():'1';
+    if(!code||code.toLowerCase().includes('итог')||!num||isNaN(parseInt(num)))continue;
+    parsed.push({id:currentTableId+'_'+i, tableId:currentTableId, num:parseInt(num), code, name, place, qty, scanned:false});
   }
-  // fallback for column positions based on your file structure
-  if (colNum < 0) colNum = 0;
-  if (colName < 0) colName = colCode + 1;
-
-  const parsed = [];
-  for (let i = headerRow + 1; i < json.length; i++) {
-    const row = json[i];
-    const code = String(row[colCode] || '').trim();
-    const num = String(row[colNum] || '').trim();
-    const name = String(row[colName] || '').trim();
-    const place = colPlace >= 0 ? String(row[colPlace] || '').trim() : '';
-    const qty = colQty >= 0 ? String(row[colQty] || '').trim() : '1';
-    const order = colOrder >= 0 ? String(row[colOrder] || '').trim() : '';
-
-    // Skip empty rows, total rows
-    if (!code || code.toLowerCase().includes('итог') || !num || isNaN(parseInt(num))) continue;
-
-    parsed.push({
-      id: currentTableId + '_' + i,
-      tableId: currentTableId,
-      num: parseInt(num),
-      order: order,
-      code: code,
-      name: name,
-      place: place,
-      qty: qty,
-      scanned: false
-    });
-  }
-
-  return {
-    fileName: fileName,
-    items: parsed
-  };
+  return parsed.length?{fileName,items:parsed}:null;
 }
 
-// ===================== TABLE MANAGEMENT =====================
-async function loadTable(data, fileName) {
-  currentTableId = 'tbl_' + Date.now();
-  const parsed = parseExcel(data, fileName);
-  if (!parsed || parsed.items.length === 0) {
-    alert('Не удалось распознать товары в файле');
-    return;
-  }
-
-  items = parsed.items;
-  scannedSet = new Set();
-  scanHistory = [];
-
-  // Save to IndexedDB
-  await dbPut('tables', {
-    id: currentTableId,
-    fileName: fileName,
-    date: new Date().toISOString(),
-    itemCount: items.length
-  });
-  await dbPut('settings', { key: 'currentTableId', value: currentTableId });
-
-  for (const item of items) {
-    await dbPut('items', item);
-  }
-
-  showMainSection(parsed.fileName);
+// ========== Table Management ==========
+async function loadTable(data,fileName){
+  currentTableId='tbl_'+Date.now();
+  const parsed=parseExcel(data,fileName);
+  if(!parsed){alert('Не удалось распознать товары');return;}
+  items=parsed.items; scanHistory=[];
+  await dbPut('tables',{id:currentTableId,fileName,date:new Date().toISOString(),itemCount:items.length});
+  await dbPut('settings',{key:'currentTableId',value:currentTableId});
+  for(const item of items) await dbPut('items',item);
+  showMainSection(fileName);
 }
-
-async function restoreState() {
-  const tid = await dbGet('settings', 'currentTableId');
-  if (!tid || !tid.value) return false;
-
-  currentTableId = tid.value;
-  const table = await dbGet('tables', currentTableId);
-  if (!table) return false;
-
-  items = await dbGetByIndex('items', 'tableId', currentTableId);
-  items.sort((a, b) => a.num - b.num);
-
-  scannedSet = new Set();
-  items.forEach(item => {
-    if (item.scanned) scannedSet.add(item.code);
-  });
-
-  scanHistory = await dbGetByIndex('scans', 'tableId', currentTableId);
-  scanHistory.sort((a, b) => b.id - a.id);
-
+async function restoreState(){
+  const tid=await dbGet('settings','currentTableId');
+  if(!tid||!tid.value)return false;
+  currentTableId=tid.value;
+  const table=await dbGet('tables',currentTableId);
+  if(!table)return false;
+  items=await dbGetByIndex('items','tableId',currentTableId);
+  items.sort((a,b)=>a.num-b.num);
+  scanHistory=await dbGetByIndex('scans','tableId',currentTableId);
+  scanHistory.sort((a,b)=>b.id-a.id);
   showMainSection(table.fileName);
   return true;
 }
-
-function showMainSection(fileName) {
-  document.getElementById('uploadSection').style.display = 'none';
-  document.getElementById('mainSection').style.display = 'block';
-  document.getElementById('scanBtn').disabled = false;
-
-  const table = { fileName: fileName };
-  document.getElementById('tableName').textContent = fileName;
-  document.getElementById('tableMeta').textContent =
-    `${items.length} товаров · Загружено ${new Date().toLocaleDateString('ru')}`;
-
-  renderTable();
-  renderHistory();
-  updateStats();
+function showMainSection(fn){
+  document.getElementById('uploadSection').style.display='none';
+  document.getElementById('mainSection').style.display='block';
+  document.getElementById('scanBtn').disabled=false;
+  document.getElementById('tableName').textContent=fn;
+  document.getElementById('tableMeta').textContent=items.length+' товаров · '+new Date().toLocaleDateString('ru');
+  renderTable(); renderHistory(); updateStats();
+}
+function loadNewTable(){
+  if(!confirm('Загрузить новую таблицу?'))return;
+  document.getElementById('uploadSection').style.display='block';
+  document.getElementById('mainSection').style.display='none';
+  document.getElementById('scanBtn').disabled=true;
 }
 
-function loadNewTable() {
-  if (!confirm('Загрузить новую таблицу? Текущие данные сохранятся в истории.')) return;
-  document.getElementById('uploadSection').style.display = 'block';
-  document.getElementById('mainSection').style.display = 'none';
-  document.getElementById('scanBtn').disabled = true;
-  document.getElementById('fileInput').value = '';
-}
-
-// ===================== RENDERING =====================
-function renderTable(filter = '') {
-  const container = document.getElementById('tableBody');
-  const f = filter.toLowerCase();
-  let html = '';
-
-  const filtered = items.filter(item => {
-    if (!f) return true;
-    return item.name.toLowerCase().includes(f) ||
-           item.code.toLowerCase().includes(f) ||
-           item.place.toLowerCase().includes(f) ||
-           String(item.num).includes(f);
-  });
-
-  for (const item of filtered) {
-    const isScanned = item.scanned;
-    html += `<div class="item-row ${isScanned ? 'scanned' : ''}" id="row-${item.num}">
-      <div class="item-num">${item.num}</div>
-      <div class="item-info">
-        <div class="item-name">${escHtml(item.name)}</div>
-        <div class="item-code">${escHtml(item.code)}</div>
-        ${item.place ? `<div class="item-loc">📍 ${escHtml(item.place)}</div>` : ''}
-      </div>
-      <div class="item-check">${isScanned ? '✅' : '⬜'}</div>
-    </div>`;
+// ========== Rendering ==========
+function renderTable(filter=''){
+  const c=document.getElementById('tableBody'), f=filter.toLowerCase();
+  const fl=items.filter(i=>!f||i.name.toLowerCase().includes(f)||i.code.toLowerCase().includes(f)||i.place.toLowerCase().includes(f)||String(i.num).includes(f));
+  if(!fl.length){c.innerHTML='<div class="empty-state"><div class="empty-icon">🔍</div><div>Ничего не найдено</div></div>';return;}
+  let h='';
+  for(const i of fl){
+    h+=`<div class="item-row ${i.scanned?'scanned':''}" id="row-${i.num}">
+      <div class="item-num">${i.num}</div>
+      <div class="item-info"><div class="item-name">${esc(i.name)}</div><div class="item-code">${esc(i.code)}</div>${i.place?`<div class="item-loc">📍 ${esc(i.place)}</div>`:''}</div>
+      <div class="item-check">${i.scanned?'✅':'⬜'}</div></div>`;
   }
-
-  if (filtered.length === 0) {
-    html = '<div class="empty-state"><div class="empty-icon">🔍</div><div>Ничего не найдено</div></div>';
+  c.innerHTML=h;
+}
+function renderHistory(){
+  const c=document.getElementById('historyList');
+  if(!scanHistory.length){c.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div><div>Пока нет сканирований</div></div>';return;}
+  let h='';
+  for(const s of scanHistory){
+    const t=new Date(s.time).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    h+=`<div class="history-item ${s.found?'hi-ok':'hi-err'}"><span class="hi-time">${t}</span><span class="hi-name">${s.found?`<b>#${s.itemNum}</b> ${esc(s.itemName)}`:`⛔ ${esc(s.code)} — нет в заявке`}</span></div>`;
   }
-
-  container.innerHTML = html;
+  c.innerHTML=h;
 }
-
-function renderHistory() {
-  const container = document.getElementById('historyList');
-  if (scanHistory.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><div>Пока нет сканирований</div></div>';
-    return;
-  }
-
-  let html = '';
-  for (const scan of scanHistory) {
-    const time = new Date(scan.time).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const cls = scan.found ? 'hi-ok' : 'hi-err';
-    const info = scan.found
-      ? `<b>#${scan.itemNum}</b> ${escHtml(scan.itemName)}`
-      : `⛔ ${escHtml(scan.code)} — нет в заявке`;
-    html += `<div class="history-item ${cls}">
-      <span class="hi-time">${time}</span>
-      <span class="hi-name">${info}</span>
-    </div>`;
-  }
-  container.innerHTML = html;
+function updateStats(){
+  const t=items.length, s=items.filter(i=>i.scanned).length;
+  document.getElementById('totalCount').textContent=t;
+  document.getElementById('scannedCount').textContent=s;
+  document.getElementById('remainingCount').textContent=t-s;
 }
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function switchTab(t){document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',c.id==='tab-'+t));}
 
-function updateStats() {
-  const total = items.length;
-  const scanned = items.filter(i => i.scanned).length;
-  document.getElementById('totalCount').textContent = total;
-  document.getElementById('scannedCount').textContent = scanned;
-  document.getElementById('remainingCount').textContent = total - scanned;
-}
-
-function escHtml(s) {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
-
-// ===================== BARCODE SCANNER =====================
-let videoStream = null;
-let scannerAnimFrame = null;
-let nativeBarcodeDetector = null;
-let html5Scanner = null;
-let scannerMode = 'none'; // 'native', 'html5', 'none'
-const DESIRED_NATIVE_FORMATS = [
-  'code_128',
-  'ean_13',
-  'ean_8',
-  'code_39',
-  'code_93',
-  'itf',
-  'codabar',
-  'upc_a',
-  'upc_e'
-];
-let supportedNativeFormatsPromise = null;
-
-function hasBarcodeDetector() {
-  return typeof BarcodeDetector !== 'undefined';
-}
-
-async function getSupportedNativeFormats() {
-  if (!hasBarcodeDetector()) return [];
-  if (!supportedNativeFormatsPromise) {
-    supportedNativeFormatsPromise = (async () => {
-      if (typeof BarcodeDetector.getSupportedFormats !== 'function') {
-        return [];
-      }
-      const formats = await BarcodeDetector.getSupportedFormats();
-      return Array.isArray(formats) ? formats : [];
-    })().catch((error) => {
-      console.warn('Could not read BarcodeDetector supported formats:', error);
-      supportedNativeFormatsPromise = null;
-      return [];
-    });
-  }
-  return supportedNativeFormatsPromise;
-}
-
-async function getPreferredNativeFormats() {
-  const supportedFormats = await getSupportedNativeFormats();
-  return DESIRED_NATIVE_FORMATS.filter(format => supportedFormats.includes(format));
-}
+// ========== BARCODE SCANNER (QuaggaJS) ==========
+let isScanning = false;
 
 async function startScanner() {
   initAudio();
-  const overlay = document.getElementById('scannerOverlay');
-  overlay.classList.add('active');
+  document.getElementById('scannerOverlay').classList.add('active');
   isScanning = true;
-  document.getElementById('manualInput').style.display = 'none';
+  document.getElementById('debugInfo').textContent = 'Запуск камеры...';
 
-  // Strategy 1: Native BarcodeDetector + getUserMedia (best for iOS 16.4+)
-  const preferredNativeFormats = await getPreferredNativeFormats();
-  if (preferredNativeFormats.length > 0) {
-    try {
-      await startNativeScanner(preferredNativeFormats);
-      return;
-    } catch (e) {
-      console.warn('Native BarcodeDetector failed:', e);
-    }
-  } else if (hasBarcodeDetector()) {
-    console.info('Skipping native BarcodeDetector: required 1D formats are not supported on this device.');
-  }
+  // Clear previous Quagga content
+  const container = document.getElementById('quaggaContainer');
+  container.innerHTML = '';
 
-  // Strategy 2: html5-qrcode library
   try {
-    await startHtml5Scanner();
-    return;
-  } catch (e) {
-    console.warn('html5-qrcode failed:', e);
-  }
-
-  // Strategy 3: Manual fallback
-  alert('Не удалось запустить камеру.\nИспользуйте ручной ввод кода (кнопка ⌨️).');
-  showManualInput();
-}
-
-async function startNativeScanner(preferredNativeFormats = []) {
-  const formats = preferredNativeFormats.length > 0
-    ? preferredNativeFormats
-    : await getPreferredNativeFormats();
-  if (formats.length === 0) {
-    throw new Error('BarcodeDetector does not support required linear barcode formats');
-  }
-
-  scannerMode = 'native';
-  const video = document.getElementById('scannerVideo');
-  video.style.display = 'block';
-
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: {
-      facingMode: { ideal: 'environment' },
-      width: { ideal: 1920 },
-      height: { ideal: 1080 },
-      focusMode: { ideal: 'continuous' }
-    },
-    audio: false
-  });
-
-  videoStream = stream;
-  video.srcObject = stream;
-  await video.play();
-
-  nativeBarcodeDetector = new BarcodeDetector({ formats });
-
-  // Scan loop
-  async function scanFrame() {
-    if (!isScanning || scannerMode !== 'native') return;
-    try {
-      if (video.readyState >= 2) {
-        const barcodes = await nativeBarcodeDetector.detect(video);
-        for (const barcode of barcodes) {
-          if (barcode.rawValue) {
-            await onScanSuccess(barcode.rawValue);
-            break;
+    await new Promise((resolve, reject) => {
+      Quagga.init({
+        inputStream: {
+          name: 'Live',
+          type: 'LiveStream',
+          target: container,
+          constraints: {
+            facingMode: 'environment',
+            width: { min: 640, ideal: 1280, max: 1920 },
+            height: { min: 480, ideal: 720, max: 1080 },
+            focusMode: 'continuous'
+          },
+          area: { // Only scan the center portion for speed
+            top: '25%',
+            right: '5%',
+            left: '5%',
+            bottom: '25%'
           }
+        },
+        locator: {
+          patchSize: 'medium',
+          halfSample: true
+        },
+        numOfWorkers: 0, // Use main thread on mobile (more reliable)
+        frequency: 10,
+        decoder: {
+          readers: [
+            'code_128_reader',
+            'ean_reader',
+            'ean_8_reader',
+            'code_39_reader',
+            'code_93_reader',
+            'i2of5_reader',
+            'codabar_reader'
+          ],
+          multiple: false
+        },
+        locate: true
+      }, function(err) {
+        if (err) { reject(err); return; }
+        resolve();
+      });
+    });
+
+    Quagga.start();
+
+    // Get video dimensions for debug
+    const video = container.querySelector('video');
+    if (video) {
+      video.setAttribute('playsinline', 'true');
+      video.setAttribute('webkit-playsinline', 'true');
+      const waitVideo = () => {
+        if (video.videoWidth > 0) {
+          document.getElementById('debugInfo').textContent =
+            `Камера: ${video.videoWidth}x${video.videoHeight} | Декодер: QuaggaJS`;
+        } else {
+          setTimeout(waitVideo, 200);
+        }
+      };
+      waitVideo();
+    }
+
+    // Handle detected barcodes
+    Quagga.onDetected(async function(result) {
+      if (!isScanning) return;
+      if (result && result.codeResult && result.codeResult.code) {
+        const code = result.codeResult.code;
+        // Extra validation: require high confidence
+        const errors = result.codeResult.decodedCodes
+          ?.filter(d => d.error != null)
+          ?.map(d => d.error) || [];
+        const avgError = errors.length > 0
+          ? errors.reduce((a, b) => a + b, 0) / errors.length
+          : 0;
+
+        // Only accept if average error is low (< 0.25) or code starts with OZN
+        if (avgError < 0.25 || code.startsWith('OZN')) {
+          await onScanSuccess(code);
         }
       }
-    } catch (e) { /* ignore frame errors */ }
-    scannerAnimFrame = requestAnimationFrame(scanFrame);
-  }
-  scannerAnimFrame = requestAnimationFrame(scanFrame);
-}
+    });
 
-async function startHtml5Scanner() {
-  scannerMode = 'html5';
-  // Hide native video, show html5-qrcode container
-  document.getElementById('scannerVideo').style.display = 'none';
-
-  // Create container if needed
-  let container = document.getElementById('html5qr-container');
-  if (!container) {
-    container = document.createElement('div');
-    container.id = 'html5qr-container';
-    document.getElementById('scanner-container').appendChild(container);
-  }
-  container.style.display = 'block';
-
-  const formatsToSupport = [
-    Html5QrcodeSupportedFormats.CODABAR,
-    Html5QrcodeSupportedFormats.CODE_128,
-    Html5QrcodeSupportedFormats.EAN_13,
-    Html5QrcodeSupportedFormats.EAN_8,
-    Html5QrcodeSupportedFormats.CODE_39,
-    Html5QrcodeSupportedFormats.CODE_93,
-    Html5QrcodeSupportedFormats.ITF,
-    Html5QrcodeSupportedFormats.UPC_A,
-    Html5QrcodeSupportedFormats.UPC_E
-  ];
-
-  html5Scanner = new Html5Qrcode('html5qr-container', {
-    formatsToSupport: formatsToSupport,
-    useBarCodeDetectorIfSupported: false,
-    verbose: false
-  });
-
-  await html5Scanner.start(
-    { facingMode: "environment" },
-    {
-      fps: 10,
-      qrbox: (vw, vh) => ({
-        width: Math.floor(Math.min(vw, vh) * 0.85),
-        height: Math.floor(Math.min(vw, vh) * 0.35)
-      }),
-      experimentalFeatures: { useBarCodeDetectorIfSupported: false }
-    },
-    onScanSuccess,
-    () => {}
-  );
-}
-
-function showManualInput() {
-  const mi = document.getElementById('manualInput');
-  mi.style.display = mi.style.display === 'none' ? 'flex' : 'none';
-  if (mi.style.display === 'flex') {
-    document.getElementById('manualCode').focus();
-  }
-}
-
-function submitManualCode() {
-  const input = document.getElementById('manualCode');
-  const code = input.value.trim();
-  if (code) {
-    onScanSuccess(code);
-    input.value = '';
+  } catch(err) {
+    console.error('Scanner error:', err);
+    document.getElementById('debugInfo').textContent = 'Ошибка: ' + (err.message || err);
+    alert('Ошибка камеры: ' + (err.message || err) +
+      '\n\nПопробуйте:\n1. Разрешить доступ к камере в настройках\n2. Нажать 📷 для фото\n3. Ввести код вручную');
   }
 }
 
 async function stopScanner() {
   isScanning = false;
-  scannerMode = 'none';
-
-  // Stop native scanner
-  if (scannerAnimFrame) {
-    cancelAnimationFrame(scannerAnimFrame);
-    scannerAnimFrame = null;
-  }
-  if (videoStream) {
-    videoStream.getTracks().forEach(t => t.stop());
-    videoStream = null;
-  }
-  const video = document.getElementById('scannerVideo');
-  if (video) {
-    video.srcObject = null;
-  }
-
-  // Stop html5-qrcode
-  if (html5Scanner) {
-    try {
-      await html5Scanner.stop();
-      html5Scanner.clear();
-    } catch (e) {}
-    html5Scanner = null;
-  }
-  const h5c = document.getElementById('html5qr-container');
-  if (h5c) h5c.style.display = 'none';
-
+  try { Quagga.stop(); } catch(e) {}
+  try { Quagga.offDetected(); } catch(e) {}
+  document.getElementById('quaggaContainer').innerHTML = '';
   document.getElementById('scannerOverlay').classList.remove('active');
-  document.getElementById('manualInput').style.display = 'none';
   hideResultToast();
 }
 
+// Manual code input
+function submitManualCode() {
+  const inp = document.getElementById('manualCode');
+  const code = inp.value.trim();
+  if (code) { onScanSuccess(code); inp.value = ''; }
+}
+document.getElementById('manualCode').addEventListener('keydown', e => { if(e.key==='Enter') submitManualCode(); });
+
+// Photo capture fallback — decode a single image
+document.getElementById('photoInput').addEventListener('change', async function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  this.value = '';
+  document.getElementById('debugInfo').textContent = 'Распознаю фото...';
+
+  const imgUrl = URL.createObjectURL(file);
+
+  Quagga.decodeSingle({
+    src: imgUrl,
+    numOfWorkers: 0,
+    inputStream: { size: 1920 },
+    decoder: {
+      readers: ['code_128_reader','ean_reader','ean_8_reader','code_39_reader']
+    },
+    locate: true,
+    locator: { patchSize: 'large', halfSample: false }
+  }, function(result) {
+    URL.revokeObjectURL(imgUrl);
+    if (result && result.codeResult && result.codeResult.code) {
+      document.getElementById('debugInfo').textContent = 'Найден: ' + result.codeResult.code;
+      onScanSuccess(result.codeResult.code);
+    } else {
+      document.getElementById('debugInfo').textContent = 'Не распознан. Попробуйте ещё.';
+      alert('Штрих-код не распознан.\nСфотографируйте ближе или введите код вручную.');
+    }
+  });
+});
+
+// ========== Scan Result Handler ==========
 async function onScanSuccess(code) {
-  // Debounce: ignore same code within 2 seconds
   const now = Date.now();
   if (code === lastScannedCode && now - lastScanTime < 2000) return;
-  lastScannedCode = code;
-  lastScanTime = now;
+  lastScannedCode = code; lastScanTime = now;
 
-  // Vibrate
-  if (settings.vibration && navigator.vibrate) {
-    navigator.vibrate(100);
-  }
+  if (settings.vibration && navigator.vibrate) navigator.vibrate(100);
 
-  // Find items with this code
-  const matchedItems = items.filter(i => i.code === code);
+  const matched = items.filter(i => i.code === code);
 
-  if (matchedItems.length > 0) {
-    // Find first UNSCANNED item with this code
-    const unscannedItem = matchedItems.find(i => !i.scanned);
-    const totalWithCode = matchedItems.length;
-    const scannedWithCode = matchedItems.filter(i => i.scanned).length;
+  if (matched.length > 0) {
+    const unscanned = matched.find(i => !i.scanned);
+    const total = matched.length;
+    const done = matched.filter(i => i.scanned).length;
 
-    if (unscannedItem) {
-      // Mark only THIS ONE item as scanned
-      unscannedItem.scanned = true;
-      await dbPut('items', unscannedItem);
-
-      const newScannedCount = scannedWithCode + 1;
-
-      showResultToast(true, {
-        number: `#${unscannedItem.num}`,
-        name: unscannedItem.name,
-        code: code,
-        already: false,
-        count: totalWithCode > 1 ? `${newScannedCount} из ${totalWithCode}` : null
-      });
+    if (unscanned) {
+      // Mark ONE item
+      unscanned.scanned = true;
+      await dbPut('items', unscanned);
       playSuccess();
 
-      // Log scan
-      const scan = {
-        tableId: currentTableId,
-        code: code,
-        found: true,
-        itemNum: String(unscannedItem.num),
-        itemName: unscannedItem.name,
-        time: new Date().toISOString(),
-        device: settings.deviceName || getDeviceId()
-      };
-      await dbPut('scans', scan);
-      scanHistory.unshift(scan);
-      syncToSheets(scan);
-
-    } else {
-      // All items with this code are already scanned
+      const newDone = done + 1;
       showResultToast(true, {
-        number: `#${matchedItems[0].num}`,
-        name: matchedItems[0].name,
-        code: code,
-        already: true,
-        count: totalWithCode > 1 ? `все ${totalWithCode} уже собраны` : null
+        number: '#' + unscanned.num,
+        name: unscanned.name,
+        code,
+        extra: total > 1 ? `✓ Собрано ${newDone} из ${total}` : ''
       });
+
+      const scan = { tableId:currentTableId, code, found:true, itemNum:String(unscanned.num), itemName:unscanned.name, time:new Date().toISOString(), device:settings.deviceName||getDeviceId() };
+      await dbPut('scans', scan); scanHistory.unshift(scan); syncToSheets(scan);
+    } else {
+      // All already scanned
       playDuplicate();
-
-      const scan = {
-        tableId: currentTableId,
-        code: code,
-        found: true,
-        itemNum: matchedItems.map(i => i.num).join(','),
-        itemName: matchedItems[0].name + ' (повтор)',
-        time: new Date().toISOString(),
-        device: settings.deviceName || getDeviceId()
-      };
-      await dbPut('scans', scan);
-      scanHistory.unshift(scan);
-      syncToSheets(scan);
-    }
-
-    updateStats();
-    renderTable(document.getElementById('searchBar').value);
-    renderHistory();
-
-  } else {
-    // Not found at all
-    showResultToast(false, { code: code });
-    playError();
-    if (settings.vibration && navigator.vibrate) {
-      navigator.vibrate([100, 50, 100]);
-    }
-
-    const scan = {
-      tableId: currentTableId,
-      code: code,
-      found: false,
-      itemNum: '',
-      itemName: '',
-      time: new Date().toISOString(),
-      device: settings.deviceName || getDeviceId()
-    };
-    await dbPut('scans', scan);
-    scanHistory.unshift(scan);
-    syncToSheets(scan);
-    renderHistory();
-  }
-}
-
-function showResultToast(success, data) {
-  const toast = document.getElementById('resultToast');
-  toast.className = 'result-toast show ' + (success ? 'success' : 'error');
-
-  if (success) {
-    document.getElementById('resultNumber').textContent = data.number;
-    document.getElementById('resultName').textContent = data.name;
-    document.getElementById('resultCode').textContent = data.code;
-    let extra = '';
-    if (data.already) {
-      extra = '⚠️ Уже отсканировано';
-      if (data.count) extra += ` (${data.count})`;
-    } else if (data.count) {
-      extra = `✓ Собрано ${data.count}`;
-    }
-    document.getElementById('resultAlready').textContent = extra;
-  } else {
-    document.getElementById('resultNumber').textContent = '⛔';
-    document.getElementById('resultName').textContent = 'Товар отсутствует в заявке';
-    document.getElementById('resultCode').textContent = data.code;
-    document.getElementById('resultAlready').textContent = '';
-  }
-
-  clearTimeout(toast._timeout);
-  toast._timeout = setTimeout(hideResultToast, 3000);
-}
-
-function hideResultToast() {
-  document.getElementById('resultToast').classList.remove('show');
-}
-
-// ===================== GOOGLE SHEETS SYNC =====================
-let syncQueue = [];
-let isSyncing = false;
-
-async function syncToSheets(scan) {
-  if (!settings.gasUrl) return;
-
-  syncQueue.push(scan);
-  if (isSyncing) return;
-  isSyncing = true;
-
-  const statusEl = document.getElementById('syncStatus');
-  statusEl.textContent = '🔄 Синхронизация...';
-  statusEl.className = 'sync-status syncing';
-
-  while (syncQueue.length > 0) {
-    const batch = syncQueue.splice(0, syncQueue.length);
-    try {
-      const table = await dbGet('tables', currentTableId);
-      const payload = {
-        sheetName: table ? table.fileName.replace(/\.[^.]+$/, '') : currentTableId,
-        scans: batch.map(s => ({
-          time: s.time,
-          code: s.code,
-          found: s.found,
-          itemNum: s.itemNum,
-          itemName: s.itemName,
-          device: s.device
-        }))
-      };
-
-      await fetch(settings.gasUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(payload)
+      showResultToast(true, {
+        number: '#' + matched[0].num,
+        name: matched[0].name,
+        code,
+        extra: total > 1 ? `⚠️ Все ${total} уже собраны` : '⚠️ Уже отсканировано'
       });
 
-      statusEl.textContent = '✅ Синхронизировано';
-      statusEl.className = 'sync-status synced';
-    } catch (e) {
-      statusEl.textContent = '❌ Ошибка синхронизации';
-      statusEl.className = 'sync-status error';
-      // Put failed items back
-      syncQueue.unshift(...batch);
-      break;
+      const scan = { tableId:currentTableId, code, found:true, itemNum:matched.map(i=>i.num).join(','), itemName:matched[0].name+' (повтор)', time:new Date().toISOString(), device:settings.deviceName||getDeviceId() };
+      await dbPut('scans', scan); scanHistory.unshift(scan); syncToSheets(scan);
     }
-  }
 
-  isSyncing = false;
-  setTimeout(() => { statusEl.textContent = ''; }, 5000);
+    updateStats(); renderTable(document.getElementById('searchBar').value); renderHistory();
+  } else {
+    // Not found
+    playError();
+    if (settings.vibration && navigator.vibrate) navigator.vibrate([100,50,100]);
+    showResultToast(false, { code });
+
+    const scan = { tableId:currentTableId, code, found:false, itemNum:'', itemName:'', time:new Date().toISOString(), device:settings.deviceName||getDeviceId() };
+    await dbPut('scans', scan); scanHistory.unshift(scan); syncToSheets(scan); renderHistory();
+  }
 }
 
-// ===================== UTILS =====================
-function getDeviceId() {
-  let id = null;
-  try { id = localStorage.getItem('device_id'); } catch(e) {}
-  if (!id) {
-    id = 'dev_' + Math.random().toString(36).substr(2, 8);
-    try { localStorage.setItem('device_id', id); } catch(e) {}
+function showResultToast(ok, data) {
+  const t = document.getElementById('resultToast');
+  t.className = 'result-toast show ' + (ok ? 'success' : 'error');
+  document.getElementById('resultNumber').textContent = ok ? data.number : '⛔';
+  document.getElementById('resultName').textContent = ok ? data.name : 'Товар отсутствует в заявке';
+  document.getElementById('resultCode').textContent = data.code;
+  document.getElementById('resultExtra').textContent = ok ? (data.extra || '') : '';
+  clearTimeout(t._t); t._t = setTimeout(hideResultToast, 3000);
+}
+function hideResultToast() { document.getElementById('resultToast').classList.remove('show'); }
+
+// ========== Google Sheets Sync ==========
+let syncQueue=[], isSyncing=false;
+async function syncToSheets(scan) {
+  if(!settings.gasUrl)return;
+  syncQueue.push(scan); if(isSyncing)return; isSyncing=true;
+  const el=document.getElementById('syncStatus');
+  el.textContent='🔄 Синхронизация...'; el.className='sync-status syncing';
+  while(syncQueue.length>0){
+    const batch=syncQueue.splice(0,syncQueue.length);
+    try{
+      const table=await dbGet('tables',currentTableId);
+      await fetch(settings.gasUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({sheetName:table?table.fileName.replace(/\.[^.]+$/,''):currentTableId,scans:batch.map(s=>({time:s.time,code:s.code,found:s.found,itemNum:s.itemNum,itemName:s.itemName,device:s.device}))})
+      });
+      el.textContent='✅ Синхронизировано'; el.className='sync-status synced';
+    }catch(e){el.textContent='❌ Ошибка синхронизации'; el.className='sync-status error'; syncQueue.unshift(...batch); break;}
   }
-  return id;
+  isSyncing=false; setTimeout(()=>{el.textContent='';},5000);
 }
 
-function switchTab(tab) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + tab));
+// ========== Utils ==========
+function getDeviceId(){ let id; try{id=localStorage.getItem('device_id')}catch(e){} if(!id){id='dev_'+Math.random().toString(36).substr(2,8); try{localStorage.setItem('device_id',id)}catch(e){}} return id; }
+
+async function exportHistory(){
+  if(!scanHistory.length){alert('Нет данных');return;}
+  const rows=[['Время','Код','Найден','№ товара','Наименование','Устройство']];
+  for(const s of scanHistory) rows.push([new Date(s.time).toLocaleString('ru'),s.code,s.found?'Да':'Нет',s.itemNum,s.itemName,s.device]);
+  const wb=XLSX.utils.book_new(), ws=XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb,ws,'Сканирования');
+  XLSX.writeFile(wb,'scan_history.xlsx');
 }
 
-async function exportHistory() {
-  if (scanHistory.length === 0) {
-    alert('Нет данных для экспорта');
-    return;
-  }
-
-  const rows = [['Время', 'Код', 'Найден', '№ товара', 'Наименование', 'Устройство']];
-  for (const s of scanHistory) {
-    rows.push([
-      new Date(s.time).toLocaleString('ru'),
-      s.code,
-      s.found ? 'Да' : 'Нет',
-      s.itemNum,
-      s.itemName,
-      s.device
-    ]);
-  }
-
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  XLSX.utils.book_append_sheet(wb, ws, 'Сканирования');
-  XLSX.writeFile(wb, 'scan_history.xlsx');
-}
-
-async function resetAll() {
-  if (!confirm('Удалить ВСЕ данные? Это действие необратимо!')) return;
-  if (!confirm('Вы уверены? Все таблицы, сканирования и настройки будут удалены.')) return;
-
-  await dbClearStore('tables');
-  await dbClearStore('items');
-  await dbClearStore('scans');
-
-  currentTableId = null;
-  items = [];
-  scannedSet = new Set();
-  scanHistory = [];
-
-  document.getElementById('uploadSection').style.display = 'block';
-  document.getElementById('mainSection').style.display = 'none';
-  document.getElementById('scanBtn').disabled = true;
+async function resetAll(){
+  if(!confirm('Удалить ВСЕ данные?'))return;
+  if(!confirm('Точно уверены?'))return;
+  await dbClear('tables'); await dbClear('items'); await dbClear('scans');
+  currentTableId=null; items=[]; scanHistory=[];
+  document.getElementById('uploadSection').style.display='block';
+  document.getElementById('mainSection').style.display='none';
+  document.getElementById('scanBtn').disabled=true;
   hideSettings();
 }
 
-// ===================== INIT =====================
-document.getElementById('fileInput').addEventListener('change', async function(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = async function(e) {
-    const data = new Uint8Array(e.target.result);
-    await loadTable(data, file.name);
-  };
+// ========== Init ==========
+document.getElementById('fileInput').addEventListener('change', function(e){
+  const file=e.target.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>loadTable(new Uint8Array(ev.target.result),file.name);
   reader.readAsArrayBuffer(file);
 });
 
-// Drag & drop
-const uploadArea = document.getElementById('uploadArea');
-uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
-uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
-uploadArea.addEventListener('drop', async (e) => {
-  e.preventDefault();
-  uploadArea.classList.remove('dragover');
-  const file = e.dataTransfer.files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const data = new Uint8Array(ev.target.result);
-      await loadTable(data, file.name);
-    };
-    reader.readAsArrayBuffer(file);
+const uploadArea=document.getElementById('uploadArea');
+uploadArea.addEventListener('dragover',e=>{e.preventDefault();uploadArea.classList.add('dragover');});
+uploadArea.addEventListener('dragleave',()=>uploadArea.classList.remove('dragover'));
+uploadArea.addEventListener('drop',e=>{e.preventDefault();uploadArea.classList.remove('dragover');const f=e.dataTransfer.files[0];if(f){const r=new FileReader();r.onload=ev=>loadTable(new Uint8Array(ev.target.result),f.name);r.readAsArrayBuffer(f);}});
+
+document.getElementById('searchBar').addEventListener('input',function(){renderTable(this.value);});
+document.addEventListener('touchstart',function f(){initAudio();document.removeEventListener('touchstart',f);},{once:true});
+
+(async function(){
+  await openDB(); await loadSettings();
+  if(!await restoreState()){
+    document.getElementById('uploadSection').style.display='block';
+    document.getElementById('mainSection').style.display='none';
   }
-});
-
-// Search
-document.getElementById('searchBar').addEventListener('input', function() {
-  renderTable(this.value);
-});
-
-// Sound unlock for iOS
-document.addEventListener('touchstart', function initTouch() {
-  initAudio();
-  document.removeEventListener('touchstart', initTouch);
-}, { once: true });
-
-// Enter key for manual input
-document.getElementById('manualCode').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') submitManualCode();
-});
-
-// Init
-(async function init() {
-  await openDB();
-  await loadSettings();
-
-  const restored = await restoreState();
-  if (!restored) {
-    document.getElementById('uploadSection').style.display = 'block';
-    document.getElementById('mainSection').style.display = 'none';
-  }
-
-  // Register service worker
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 </script>
-
 </body>
 </html>
