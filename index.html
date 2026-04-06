@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a1a2e">
+<title>Склад Сканер</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+:root {
+  --bg: #1a1a2e;
+  --surface: #16213e;
+  --surface2: #0f3460;
+  --accent: #e94560;
+  --green: #00c853;
+  --red: #ff1744;
+  --text: #eee;
+  --text2: #aaa;
+  --radius: 12px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+.app { max-width: 600px; margin: 0 auto; padding: 12px; padding-bottom: 100px; }
+
+/* Header */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0; margin-bottom: 8px;
+}
+.header h1 { font-size: 20px; font-weight: 700; }
+.header-actions { display: flex; gap: 8px; }
+.icon-btn {
+  width: 40px; height: 40px; border-radius: 50%; border: none;
+  background: var(--surface); color: var(--text); font-size: 18px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: background 0.2s;
+}
+.icon-btn:active { background: var(--surface2); }
+
+/* Stats bar */
+.stats {
+  display: flex; gap: 8px; margin-bottom: 12px;
+}
+.stat-card {
+  flex: 1; background: var(--surface); border-radius: var(--radius);
+  padding: 10px; text-align: center;
+}
+.stat-num { font-size: 24px; font-weight: 700; }
+.stat-label { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.stat-card.scanned .stat-num { color: var(--green); }
+.stat-card.remaining .stat-num { color: var(--accent); }
+
+/* Upload area */
+.upload-area {
+  border: 2px dashed var(--surface2);
+  border-radius: var(--radius);
+  padding: 40px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.3s, background 0.3s;
+  margin-bottom: 12px;
+}
+.upload-area:active, .upload-area.dragover {
+  border-color: var(--accent);
+  background: rgba(233, 69, 96, 0.1);
+}
+.upload-icon { font-size: 48px; margin-bottom: 12px; }
+.upload-text { color: var(--text2); font-size: 14px; }
+.upload-text strong { color: var(--text); }
+input[type="file"] { display: none; }
+
+/* Scan button */
+.scan-btn {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  width: calc(100% - 24px); max-width: 576px;
+  padding: 16px; border: none; border-radius: var(--radius);
+  background: var(--accent); color: white;
+  font-size: 18px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  z-index: 100; box-shadow: 0 4px 20px rgba(233, 69, 96, 0.4);
+  transition: transform 0.1s, opacity 0.3s;
+}
+.scan-btn:active { transform: translateX(-50%) scale(0.97); }
+.scan-btn:disabled { opacity: 0.5; }
+.scan-btn svg { width: 24px; height: 24px; }
+
+/* Scanner overlay */
+.scanner-overlay {
+  position: fixed; inset: 0; background: #000; z-index: 1000;
+  display: none; flex-direction: column;
+}
+.scanner-overlay.active { display: flex; }
+.scanner-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; background: rgba(0,0,0,0.8); z-index: 10;
+}
+.scanner-header h2 { font-size: 16px; color: white; }
+.scanner-close {
+  width: 36px; height: 36px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3);
+  background: transparent; color: white; font-size: 20px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+#scanner-container { flex: 1; position: relative; overflow: hidden; }
+#scanner-container video { width: 100% !important; height: 100% !important; object-fit: cover !important; }
+
+/* Result toast */
+.result-toast {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  padding: 20px 16px; padding-bottom: max(20px, env(safe-area-inset-bottom));
+  z-index: 1001; transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: center;
+}
+.result-toast.show { transform: translateY(0); }
+.result-toast.success { background: linear-gradient(to top, rgba(0,200,83,0.95), rgba(0,200,83,0.85)); }
+.result-toast.error { background: linear-gradient(to top, rgba(255,23,68,0.95), rgba(255,23,68,0.85)); }
+.result-toast .result-number { font-size: 48px; font-weight: 800; }
+.result-toast .result-name { font-size: 16px; font-weight: 600; margin-top: 4px; }
+.result-toast .result-code { font-size: 12px; opacity: 0.8; margin-top: 4px; }
+.result-toast .result-already { font-size: 13px; opacity: 0.9; margin-top: 6px; font-style: italic; }
+
+/* Table */
+.table-section { margin-top: 12px; }
+.search-bar {
+  width: 100%; padding: 10px 14px; border-radius: var(--radius);
+  border: 1px solid var(--surface2); background: var(--surface);
+  color: var(--text); font-size: 14px; margin-bottom: 10px;
+  outline: none;
+}
+.search-bar:focus { border-color: var(--accent); }
+.table-wrap {
+  border-radius: var(--radius); overflow: hidden;
+  background: var(--surface);
+}
+.item-row {
+  display: flex; align-items: center; padding: 10px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  transition: background 0.3s;
+  gap: 10px;
+}
+.item-row.scanned { background: rgba(0, 200, 83, 0.15); }
+.item-row .item-num {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--surface2); display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; flex-shrink: 0;
+}
+.item-row.scanned .item-num { background: var(--green); color: #000; }
+.item-info { flex: 1; min-width: 0; }
+.item-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-code { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.item-loc { font-size: 11px; color: var(--accent); }
+.item-check { font-size: 20px; flex-shrink: 0; }
+
+/* Settings panel */
+.settings-panel {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  z-index: 500; display: none; align-items: flex-end; justify-content: center;
+}
+.settings-panel.active { display: flex; }
+.settings-content {
+  background: var(--surface); border-radius: var(--radius) var(--radius) 0 0;
+  width: 100%; max-width: 600px; padding: 20px 16px;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+  max-height: 80vh; overflow-y: auto;
+}
+.settings-content h3 { margin-bottom: 16px; }
+.setting-group { margin-bottom: 16px; }
+.setting-group label { display: block; font-size: 13px; color: var(--text2); margin-bottom: 6px; }
+.setting-group input, .setting-group select {
+  width: 100%; padding: 10px; border-radius: 8px;
+  border: 1px solid var(--surface2); background: var(--bg);
+  color: var(--text); font-size: 14px;
+}
+.setting-group input:focus { border-color: var(--accent); outline: none; }
+.settings-actions { display: flex; gap: 10px; margin-top: 16px; }
+.btn {
+  flex: 1; padding: 12px; border: none; border-radius: 8px;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.btn-primary { background: var(--accent); color: white; }
+.btn-secondary { background: var(--surface2); color: var(--text); }
+.btn-danger { background: var(--red); color: white; }
+
+/* Scan history */
+.history-section { margin-top: 16px; }
+.history-section h3 { font-size: 14px; color: var(--text2); margin-bottom: 8px; }
+.history-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; background: var(--surface);
+  border-radius: 8px; margin-bottom: 4px; font-size: 13px;
+}
+.history-item .hi-time { color: var(--text2); font-size: 11px; flex-shrink: 0; }
+.history-item .hi-name { flex: 1; }
+.history-item.hi-err { border-left: 3px solid var(--red); }
+.history-item.hi-ok { border-left: 3px solid var(--green); }
+
+/* Loading */
+.loading { text-align: center; padding: 40px; color: var(--text2); }
+
+/* Table info */
+.table-info {
+  background: var(--surface); border-radius: var(--radius);
+  padding: 12px; margin-bottom: 12px;
+}
+.table-info .ti-name { font-weight: 600; font-size: 14px; }
+.table-info .ti-meta { font-size: 12px; color: var(--text2); margin-top: 4px; }
+
+/* Vibrate for iOS sound unlock */
+.sound-unlock {
+  position: fixed; inset: 0; z-index: 2000;
+  background: rgba(0,0,0,0.8); display: none;
+  align-items: center; justify-content: center;
+}
+.sound-unlock.active { display: flex; }
+.sound-unlock-btn {
+  padding: 20px 40px; border: none; border-radius: var(--radius);
+  background: var(--accent); color: white; font-size: 18px;
+  font-weight: 700; cursor: pointer;
+}
+
+/* Tabs */
+.tab-bar {
+  display: flex; gap: 4px; margin-bottom: 12px;
+  background: var(--surface); border-radius: var(--radius); padding: 4px;
+}
+.tab-btn {
+  flex: 1; padding: 8px; border: none; border-radius: 8px;
+  background: transparent; color: var(--text2); font-size: 13px;
+  font-weight: 600; cursor: pointer; transition: all 0.2s;
+}
+.tab-btn.active { background: var(--accent); color: white; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Sync status */
+.sync-status {
+  font-size: 11px; color: var(--text2); text-align: center;
+  margin-top: 8px; padding: 6px;
+}
+.sync-status.syncing { color: #ffb300; }
+.sync-status.synced { color: var(--green); }
+.sync-status.error { color: var(--red); }
+
+/* Empty state */
+.empty-state { text-align: center; padding: 30px; color: var(--text2); }
+.empty-state .empty-icon { font-size: 40px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <!-- Sound unlock overlay (needed for iOS) -->
+  <div class="sound-unlock" id="soundUnlock">
+    <button class="sound-unlock-btn" onclick="unlockSound()">🔊 Включить звук</button>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <h1>📦 Склад Сканер</h1>
+    <div class="header-actions">
+      <button class="icon-btn" onclick="showSettings()" title="Настройки">⚙️</button>
+      <button class="icon-btn" onclick="exportHistory()" title="Экспорт">📤</button>
+    </div>
+  </div>
+
+  <!-- Upload area (shown when no table loaded) -->
+  <div id="uploadSection">
+    <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+      <div class="upload-icon">📋</div>
+      <div class="upload-text">
+        <strong>Загрузите Excel файл</strong><br>
+        Лист отбора с артикулами OZON
+      </div>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+  </div>
+
+  <!-- Main content (shown after table loaded) -->
+  <div id="mainSection" style="display:none;">
+    <!-- Table info -->
+    <div class="table-info" id="tableInfo">
+      <div class="ti-name" id="tableName"></div>
+      <div class="ti-meta" id="tableMeta"></div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-num" id="totalCount">0</div>
+        <div class="stat-label">Всего</div>
+      </div>
+      <div class="stat-card scanned">
+        <div class="stat-num" id="scannedCount">0</div>
+        <div class="stat-label">Собрано</div>
+      </div>
+      <div class="stat-card remaining">
+        <div class="stat-num" id="remainingCount">0</div>
+        <div class="stat-label">Осталось</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="table" onclick="switchTab('table')">Таблица</button>
+      <button class="tab-btn" data-tab="history" onclick="switchTab('history')">История</button>
+    </div>
+
+    <!-- Table tab -->
+    <div class="tab-content active" id="tab-table">
+      <input type="text" class="search-bar" id="searchBar" placeholder="🔍 Поиск по названию, коду или месту...">
+      <div class="table-wrap" id="tableBody"></div>
+    </div>
+
+    <!-- History tab -->
+    <div class="tab-content" id="tab-history">
+      <div id="historyList">
+        <div class="empty-state">
+          <div class="empty-icon">📭</div>
+          <div>Пока нет сканирований</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sync-status" id="syncStatus"></div>
+
+    <!-- New table button -->
+    <div style="margin-top: 16px; text-align: center;">
+      <button class="btn btn-secondary" onclick="loadNewTable()" style="width: auto; padding: 10px 20px;">
+        📋 Загрузить другую таблицу
+      </button>
+    </div>
+  </div>
+
+  <!-- Scan button -->
+  <button class="scan-btn" id="scanBtn" onclick="startScanner()" disabled>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M1 4V1h3M20 1h3v3M1 20v3h3M20 23h3v-3"/>
+      <line x1="1" y1="12" x2="23" y2="12"/>
+    </svg>
+    Сканировать
+  </button>
+</div>
+
+<!-- Scanner overlay -->
+<div class="scanner-overlay" id="scannerOverlay">
+  <div class="scanner-header">
+    <h2>Сканирование</h2>
+    <button class="scanner-close" onclick="stopScanner()">✕</button>
+  </div>
+  <div id="scanner-container"></div>
+  <div class="result-toast" id="resultToast">
+    <div class="result-number" id="resultNumber"></div>
+    <div class="result-name" id="resultName"></div>
+    <div class="result-code" id="resultCode"></div>
+    <div class="result-already" id="resultAlready"></div>
+  </div>
+</div>
+
+<!-- Settings panel -->
+<div class="settings-panel" id="settingsPanel" onclick="if(event.target===this)hideSettings()">
+  <div class="settings-content">
+    <h3>⚙️ Настройки</h3>
+    <div class="setting-group">
+      <label>Имя устройства (для идентификации)</label>
+      <input type="text" id="deviceName" placeholder="Например: Телефон Петрова">
+    </div>
+    <div class="setting-group">
+      <label>URL Google Apps Script (для синхронизации)</label>
+      <input type="url" id="gasUrl" placeholder="https://script.google.com/macros/s/...">
+    </div>
+    <div class="setting-group">
+      <label>Вибрация при сканировании</label>
+      <select id="vibrationEnabled">
+        <option value="1">Включена</option>
+        <option value="0">Выключена</option>
+      </select>
+    </div>
+    <div class="settings-actions">
+      <button class="btn btn-secondary" onclick="hideSettings()">Закрыть</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Сохранить</button>
+    </div>
+    <div style="margin-top: 16px; border-top: 1px solid var(--surface2); padding-top: 16px;">
+      <button class="btn btn-danger" onclick="resetAll()" style="width: 100%;">🗑 Сбросить все данные</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== DATABASE (IndexedDB) =====================
+const DB_NAME = 'WarehouseScanner';
+const DB_VERSION = 2;
+let db = null;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('tables')) {
+        d.createObjectStore('tables', { keyPath: 'id' });
+      }
+      if (!d.objectStoreNames.contains('items')) {
+        const store = d.createObjectStore('items', { keyPath: 'id' });
+        store.createIndex('tableId', 'tableId');
+        store.createIndex('code', 'code');
+      }
+      if (!d.objectStoreNames.contains('scans')) {
+        const store = d.createObjectStore('scans', { keyPath: 'id', autoIncrement: true });
+        store.createIndex('tableId', 'tableId');
+      }
+      if (!d.objectStoreNames.contains('settings')) {
+        d.createObjectStore('settings', { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = () => { db = req.result; resolve(db); };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function dbPut(store, data) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).put(data);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function dbGet(store, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function dbGetAll(store) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function dbGetByIndex(store, indexName, value) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const idx = tx.objectStore(store).index(indexName);
+    const req = idx.getAll(value);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function dbClearStore(store) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// ===================== SETTINGS =====================
+let settings = {
+  deviceName: '',
+  gasUrl: '',
+  vibration: true
+};
+
+async function loadSettings() {
+  try {
+    const dn = await dbGet('settings', 'deviceName');
+    const gu = await dbGet('settings', 'gasUrl');
+    const vb = await dbGet('settings', 'vibration');
+    if (dn) settings.deviceName = dn.value;
+    if (gu) settings.gasUrl = gu.value;
+    if (vb !== undefined && vb !== null) settings.vibration = vb.value;
+  } catch(e) {}
+  document.getElementById('deviceName').value = settings.deviceName;
+  document.getElementById('gasUrl').value = settings.gasUrl;
+  document.getElementById('vibrationEnabled').value = settings.vibration ? '1' : '0';
+}
+
+async function saveSettings() {
+  settings.deviceName = document.getElementById('deviceName').value.trim();
+  settings.gasUrl = document.getElementById('gasUrl').value.trim();
+  settings.vibration = document.getElementById('vibrationEnabled').value === '1';
+  await dbPut('settings', { key: 'deviceName', value: settings.deviceName });
+  await dbPut('settings', { key: 'gasUrl', value: settings.gasUrl });
+  await dbPut('settings', { key: 'vibration', value: settings.vibration });
+  hideSettings();
+}
+
+function showSettings() { document.getElementById('settingsPanel').classList.add('active'); }
+function hideSettings() { document.getElementById('settingsPanel').classList.remove('active'); }
+
+// ===================== SOUND =====================
+let audioCtx = null;
+let soundUnlocked = false;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+function playTone(frequency, duration, type = 'sine', volume = 0.3) {
+  if (!audioCtx) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type = type;
+    osc.frequency.value = frequency;
+    gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch(e) {}
+}
+
+function playSuccess() {
+  playTone(880, 0.15, 'sine', 0.4);
+  setTimeout(() => playTone(1108, 0.15, 'sine', 0.4), 100);
+  setTimeout(() => playTone(1320, 0.25, 'sine', 0.4), 200);
+}
+
+function playError() {
+  playTone(300, 0.3, 'square', 0.3);
+  setTimeout(() => playTone(200, 0.4, 'square', 0.3), 200);
+}
+
+function playDuplicate() {
+  playTone(600, 0.1, 'sine', 0.3);
+  setTimeout(() => playTone(600, 0.1, 'sine', 0.3), 200);
+}
+
+function unlockSound() {
+  initAudio();
+  playTone(1, 0.01, 'sine', 0.01);
+  soundUnlocked = true;
+  document.getElementById('soundUnlock').classList.remove('active');
+}
+
+// ===================== STATE =====================
+let currentTableId = null;
+let items = [];
+let scannedSet = new Set();
+let scanHistory = [];
+let scanner = null;
+let isScanning = false;
+let lastScannedCode = '';
+let lastScanTime = 0;
+
+// ===================== EXCEL PARSING =====================
+function parseExcel(data, fileName) {
+  const wb = XLSX.read(data, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+  // Find header row with "Артикул" or "Код OZON"
+  let headerRow = -1;
+  let colNum = -1, colOrder = -1, colCode = -1, colName = -1, colPlace = -1, colQty = -1;
+
+  for (let i = 0; i < Math.min(json.length, 10); i++) {
+    const row = json[i].map(c => String(c).toLowerCase());
+    for (let j = 0; j < row.length; j++) {
+      if (row[j].includes('артикул') || row[j].includes('код ozon') || row[j].includes('код_ozon')) {
+        headerRow = i;
+        colCode = j;
+        break;
+      }
+    }
+    if (headerRow >= 0) break;
+  }
+
+  if (headerRow < 0) {
+    alert('Не найден столбец "Артикул/Код OZON" в файле');
+    return null;
+  }
+
+  // Identify other columns
+  const hdr = json[headerRow].map(c => String(c).toLowerCase());
+  for (let j = 0; j < hdr.length; j++) {
+    if (hdr[j] === '№' || hdr[j] === 'no' || hdr[j] === 'п/п') colNum = j;
+    if (hdr[j].includes('номер заказа') || hdr[j].includes('заказ')) colOrder = j;
+    if (hdr[j].includes('наименование')) colName = j;
+    if (hdr[j].includes('место')) colPlace = j;
+    if (hdr[j].includes('кол')) colQty = j;
+  }
+  // fallback for column positions based on your file structure
+  if (colNum < 0) colNum = 0;
+  if (colName < 0) colName = colCode + 1;
+
+  const parsed = [];
+  for (let i = headerRow + 1; i < json.length; i++) {
+    const row = json[i];
+    const code = String(row[colCode] || '').trim();
+    const num = String(row[colNum] || '').trim();
+    const name = String(row[colName] || '').trim();
+    const place = colPlace >= 0 ? String(row[colPlace] || '').trim() : '';
+    const qty = colQty >= 0 ? String(row[colQty] || '').trim() : '1';
+    const order = colOrder >= 0 ? String(row[colOrder] || '').trim() : '';
+
+    // Skip empty rows, total rows
+    if (!code || code.toLowerCase().includes('итог') || !num || isNaN(parseInt(num))) continue;
+
+    parsed.push({
+      id: currentTableId + '_' + i,
+      tableId: currentTableId,
+      num: parseInt(num),
+      order: order,
+      code: code,
+      name: name,
+      place: place,
+      qty: qty,
+      scanned: false
+    });
+  }
+
+  return {
+    fileName: fileName,
+    items: parsed
+  };
+}
+
+// ===================== TABLE MANAGEMENT =====================
+async function loadTable(data, fileName) {
+  currentTableId = 'tbl_' + Date.now();
+  const parsed = parseExcel(data, fileName);
+  if (!parsed || parsed.items.length === 0) {
+    alert('Не удалось распознать товары в файле');
+    return;
+  }
+
+  items = parsed.items;
+  scannedSet = new Set();
+  scanHistory = [];
+
+  // Save to IndexedDB
+  await dbPut('tables', {
+    id: currentTableId,
+    fileName: fileName,
+    date: new Date().toISOString(),
+    itemCount: items.length
+  });
+  await dbPut('settings', { key: 'currentTableId', value: currentTableId });
+
+  for (const item of items) {
+    await dbPut('items', item);
+  }
+
+  showMainSection(parsed.fileName);
+}
+
+async function restoreState() {
+  const tid = await dbGet('settings', 'currentTableId');
+  if (!tid || !tid.value) return false;
+
+  currentTableId = tid.value;
+  const table = await dbGet('tables', currentTableId);
+  if (!table) return false;
+
+  items = await dbGetByIndex('items', 'tableId', currentTableId);
+  items.sort((a, b) => a.num - b.num);
+
+  scannedSet = new Set();
+  items.forEach(item => {
+    if (item.scanned) scannedSet.add(item.code);
+  });
+
+  scanHistory = await dbGetByIndex('scans', 'tableId', currentTableId);
+  scanHistory.sort((a, b) => b.id - a.id);
+
+  showMainSection(table.fileName);
+  return true;
+}
+
+function showMainSection(fileName) {
+  document.getElementById('uploadSection').style.display = 'none';
+  document.getElementById('mainSection').style.display = 'block';
+  document.getElementById('scanBtn').disabled = false;
+
+  const table = { fileName: fileName };
+  document.getElementById('tableName').textContent = fileName;
+  document.getElementById('tableMeta').textContent =
+    `${items.length} товаров · Загружено ${new Date().toLocaleDateString('ru')}`;
+
+  renderTable();
+  renderHistory();
+  updateStats();
+}
+
+function loadNewTable() {
+  if (!confirm('Загрузить новую таблицу? Текущие данные сохранятся в истории.')) return;
+  document.getElementById('uploadSection').style.display = 'block';
+  document.getElementById('mainSection').style.display = 'none';
+  document.getElementById('scanBtn').disabled = true;
+  document.getElementById('fileInput').value = '';
+}
+
+// ===================== RENDERING =====================
+function renderTable(filter = '') {
+  const container = document.getElementById('tableBody');
+  const f = filter.toLowerCase();
+  let html = '';
+
+  const filtered = items.filter(item => {
+    if (!f) return true;
+    return item.name.toLowerCase().includes(f) ||
+           item.code.toLowerCase().includes(f) ||
+           item.place.toLowerCase().includes(f) ||
+           String(item.num).includes(f);
+  });
+
+  for (const item of filtered) {
+    const isScanned = item.scanned;
+    html += `<div class="item-row ${isScanned ? 'scanned' : ''}" id="row-${item.num}">
+      <div class="item-num">${item.num}</div>
+      <div class="item-info">
+        <div class="item-name">${escHtml(item.name)}</div>
+        <div class="item-code">${escHtml(item.code)}</div>
+        ${item.place ? `<div class="item-loc">📍 ${escHtml(item.place)}</div>` : ''}
+      </div>
+      <div class="item-check">${isScanned ? '✅' : '⬜'}</div>
+    </div>`;
+  }
+
+  if (filtered.length === 0) {
+    html = '<div class="empty-state"><div class="empty-icon">🔍</div><div>Ничего не найдено</div></div>';
+  }
+
+  container.innerHTML = html;
+}
+
+function renderHistory() {
+  const container = document.getElementById('historyList');
+  if (scanHistory.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><div>Пока нет сканирований</div></div>';
+    return;
+  }
+
+  let html = '';
+  for (const scan of scanHistory) {
+    const time = new Date(scan.time).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const cls = scan.found ? 'hi-ok' : 'hi-err';
+    const info = scan.found
+      ? `<b>#${scan.itemNum}</b> ${escHtml(scan.itemName)}`
+      : `⛔ ${escHtml(scan.code)} — нет в заявке`;
+    html += `<div class="history-item ${cls}">
+      <span class="hi-time">${time}</span>
+      <span class="hi-name">${info}</span>
+    </div>`;
+  }
+  container.innerHTML = html;
+}
+
+function updateStats() {
+  const total = items.length;
+  const scanned = items.filter(i => i.scanned).length;
+  document.getElementById('totalCount').textContent = total;
+  document.getElementById('scannedCount').textContent = scanned;
+  document.getElementById('remainingCount').textContent = total - scanned;
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ===================== BARCODE SCANNER =====================
+async function startScanner() {
+  initAudio();
+  const overlay = document.getElementById('scannerOverlay');
+  overlay.classList.add('active');
+  isScanning = true;
+
+  try {
+    scanner = new Html5Qrcode('scanner-container');
+    const cameras = await Html5Qrcode.getCameras();
+    if (!cameras || cameras.length === 0) {
+      alert('Камера не найдена');
+      stopScanner();
+      return;
+    }
+
+    // Prefer back camera
+    let cameraId = cameras[0].id;
+    for (const cam of cameras) {
+      if (cam.label.toLowerCase().includes('back') ||
+          cam.label.toLowerCase().includes('задн') ||
+          cam.label.toLowerCase().includes('rear') ||
+          cam.label.toLowerCase().includes('environment')) {
+        cameraId = cam.id;
+        break;
+      }
+    }
+
+    await scanner.start(
+      cameraId,
+      {
+        fps: 15,
+        qrbox: function(vw, vh) {
+          const min = Math.min(vw, vh);
+          return { width: Math.floor(min * 0.85), height: Math.floor(min * 0.35) };
+        },
+        aspectRatio: window.innerHeight / window.innerWidth,
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.CODE_93,
+          Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.CODABAR
+        ]
+      },
+      onScanSuccess,
+      () => {} // ignore scan errors
+    );
+  } catch (err) {
+    console.error('Scanner error:', err);
+    alert('Ошибка камеры: ' + (err.message || err));
+    stopScanner();
+  }
+}
+
+async function stopScanner() {
+  isScanning = false;
+  const overlay = document.getElementById('scannerOverlay');
+  overlay.classList.remove('active');
+  hideResultToast();
+
+  if (scanner) {
+    try {
+      await scanner.stop();
+      scanner.clear();
+    } catch (e) {}
+    scanner = null;
+  }
+}
+
+async function onScanSuccess(code) {
+  // Debounce: ignore same code within 2.5 seconds
+  const now = Date.now();
+  if (code === lastScannedCode && now - lastScanTime < 2500) return;
+  lastScannedCode = code;
+  lastScanTime = now;
+
+  // Vibrate
+  if (settings.vibration && navigator.vibrate) {
+    navigator.vibrate(100);
+  }
+
+  // Find item
+  const matchedItems = items.filter(i => i.code === code);
+
+  if (matchedItems.length > 0) {
+    const alreadyScanned = matchedItems[0].scanned;
+
+    // Mark all items with this code as scanned
+    for (const item of matchedItems) {
+      if (!item.scanned) {
+        item.scanned = true;
+        scannedSet.add(item.code);
+        await dbPut('items', item);
+      }
+    }
+
+    // Show first match info
+    const item = matchedItems[0];
+    const nums = matchedItems.map(i => i.num).join(', ');
+
+    showResultToast(true, {
+      number: matchedItems.length > 1 ? `#${nums}` : `#${item.num}`,
+      name: item.name,
+      code: code,
+      already: alreadyScanned,
+      count: matchedItems.length
+    });
+
+    if (alreadyScanned) {
+      playDuplicate();
+    } else {
+      playSuccess();
+    }
+
+    // Log scan
+    const scan = {
+      tableId: currentTableId,
+      code: code,
+      found: true,
+      itemNum: nums,
+      itemName: item.name,
+      time: new Date().toISOString(),
+      device: settings.deviceName || getDeviceId()
+    };
+    await dbPut('scans', scan);
+    scanHistory.unshift(scan);
+
+    // Sync to Google Sheets
+    syncToSheets(scan);
+
+    updateStats();
+    renderTable(document.getElementById('searchBar').value);
+    renderHistory();
+
+  } else {
+    // Not found
+    showResultToast(false, { code: code });
+    playError();
+    if (settings.vibration && navigator.vibrate) {
+      navigator.vibrate([100, 50, 100]);
+    }
+
+    const scan = {
+      tableId: currentTableId,
+      code: code,
+      found: false,
+      itemNum: '',
+      itemName: '',
+      time: new Date().toISOString(),
+      device: settings.deviceName || getDeviceId()
+    };
+    await dbPut('scans', scan);
+    scanHistory.unshift(scan);
+    syncToSheets(scan);
+    renderHistory();
+  }
+}
+
+function showResultToast(success, data) {
+  const toast = document.getElementById('resultToast');
+  toast.className = 'result-toast show ' + (success ? 'success' : 'error');
+
+  if (success) {
+    document.getElementById('resultNumber').textContent = data.number;
+    document.getElementById('resultName').textContent = data.name;
+    document.getElementById('resultCode').textContent = data.code;
+    document.getElementById('resultAlready').textContent =
+      data.already ? '⚠️ Уже было отсканировано ранее' :
+      (data.count > 1 ? `✓ Найдено в ${data.count} позициях` : '');
+  } else {
+    document.getElementById('resultNumber').textContent = '⛔';
+    document.getElementById('resultName').textContent = 'Товар отсутствует в заявке';
+    document.getElementById('resultCode').textContent = data.code;
+    document.getElementById('resultAlready').textContent = '';
+  }
+
+  clearTimeout(toast._timeout);
+  toast._timeout = setTimeout(hideResultToast, 3000);
+}
+
+function hideResultToast() {
+  document.getElementById('resultToast').classList.remove('show');
+}
+
+// ===================== GOOGLE SHEETS SYNC =====================
+let syncQueue = [];
+let isSyncing = false;
+
+async function syncToSheets(scan) {
+  if (!settings.gasUrl) return;
+
+  syncQueue.push(scan);
+  if (isSyncing) return;
+  isSyncing = true;
+
+  const statusEl = document.getElementById('syncStatus');
+  statusEl.textContent = '🔄 Синхронизация...';
+  statusEl.className = 'sync-status syncing';
+
+  while (syncQueue.length > 0) {
+    const batch = syncQueue.splice(0, syncQueue.length);
+    try {
+      const table = await dbGet('tables', currentTableId);
+      const payload = {
+        sheetName: table ? table.fileName.replace(/\.[^.]+$/, '') : currentTableId,
+        scans: batch.map(s => ({
+          time: s.time,
+          code: s.code,
+          found: s.found,
+          itemNum: s.itemNum,
+          itemName: s.itemName,
+          device: s.device
+        }))
+      };
+
+      await fetch(settings.gasUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      });
+
+      statusEl.textContent = '✅ Синхронизировано';
+      statusEl.className = 'sync-status synced';
+    } catch (e) {
+      statusEl.textContent = '❌ Ошибка синхронизации';
+      statusEl.className = 'sync-status error';
+      // Put failed items back
+      syncQueue.unshift(...batch);
+      break;
+    }
+  }
+
+  isSyncing = false;
+  setTimeout(() => { statusEl.textContent = ''; }, 5000);
+}
+
+// ===================== UTILS =====================
+function getDeviceId() {
+  let id = null;
+  try { id = localStorage.getItem('device_id'); } catch(e) {}
+  if (!id) {
+    id = 'dev_' + Math.random().toString(36).substr(2, 8);
+    try { localStorage.setItem('device_id', id); } catch(e) {}
+  }
+  return id;
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + tab));
+}
+
+async function exportHistory() {
+  if (scanHistory.length === 0) {
+    alert('Нет данных для экспорта');
+    return;
+  }
+
+  const rows = [['Время', 'Код', 'Найден', '№ товара', 'Наименование', 'Устройство']];
+  for (const s of scanHistory) {
+    rows.push([
+      new Date(s.time).toLocaleString('ru'),
+      s.code,
+      s.found ? 'Да' : 'Нет',
+      s.itemNum,
+      s.itemName,
+      s.device
+    ]);
+  }
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Сканирования');
+  XLSX.writeFile(wb, 'scan_history.xlsx');
+}
+
+async function resetAll() {
+  if (!confirm('Удалить ВСЕ данные? Это действие необратимо!')) return;
+  if (!confirm('Вы уверены? Все таблицы, сканирования и настройки будут удалены.')) return;
+
+  await dbClearStore('tables');
+  await dbClearStore('items');
+  await dbClearStore('scans');
+
+  currentTableId = null;
+  items = [];
+  scannedSet = new Set();
+  scanHistory = [];
+
+  document.getElementById('uploadSection').style.display = 'block';
+  document.getElementById('mainSection').style.display = 'none';
+  document.getElementById('scanBtn').disabled = true;
+  hideSettings();
+}
+
+// ===================== INIT =====================
+document.getElementById('fileInput').addEventListener('change', async function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const data = new Uint8Array(e.target.result);
+    await loadTable(data, file.name);
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+// Drag & drop
+const uploadArea = document.getElementById('uploadArea');
+uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+uploadArea.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  uploadArea.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const data = new Uint8Array(ev.target.result);
+      await loadTable(data, file.name);
+    };
+    reader.readAsArrayBuffer(file);
+  }
+});
+
+// Search
+document.getElementById('searchBar').addEventListener('input', function() {
+  renderTable(this.value);
+});
+
+// Sound unlock for iOS
+document.addEventListener('touchstart', function initTouch() {
+  initAudio();
+  document.removeEventListener('touchstart', initTouch);
+}, { once: true });
+
+// Init
+(async function init() {
+  await openDB();
+  await loadSettings();
+
+  const restored = await restoreState();
+  if (!restored) {
+    document.getElementById('uploadSection').style.display = 'block';
+    document.getElementById('mainSection').style.display = 'none';
+  }
+
+  // Register service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+})();
+</script>
+
+</body>
+</html>
