@@ -12,6 +12,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://unpkg.com/@AstoriaZ/zxing-browser@0.1.7/umd/index.min.js"></script>
 <style>
 :root {
   --bg: #1a1a2e;
@@ -115,11 +116,39 @@ input[type="file"] { display: none; }
   display: flex; align-items: center; justify-content: center;
 }
 #scanner-container { flex: 1; position: relative; overflow: hidden; background: #000; }
-#scanner-container video { width: 100% !important; height: 100% !important; object-fit: cover !important; }
-#scanner-container img { display: none !important; }
-/* Fix html5-qrcode canvas/shaded region on iOS */
-#scanner-container > div { width: 100% !important; height: 100% !important; }
-#qr-shaded-region { border-color: rgba(233, 69, 96, 0.5) !important; }
+#scannerVideo { width: 100%; height: 100%; object-fit: cover; }
+.scan-region-highlight {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 85%; height: 120px; max-height: 25%;
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);
+}
+.scan-line {
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 2px; background: var(--accent);
+  animation: scanMove 2s ease-in-out infinite;
+  box-shadow: 0 0 8px var(--accent);
+}
+@keyframes scanMove { 0%,100%{top:0} 50%{top:100%} }
+.manual-input {
+  position: absolute; bottom: 80px; left: 12px; right: 12px;
+  display: flex; gap: 8px; z-index: 10;
+}
+.manual-input input {
+  flex: 1; padding: 12px; border-radius: 8px; border: none;
+  background: var(--surface); color: var(--text); font-size: 16px;
+}
+.manual-input button {
+  padding: 12px 20px; border-radius: 8px; border: none;
+  background: var(--accent); color: white; font-weight: 700; font-size: 16px;
+  cursor: pointer;
+}
+/* Legacy html5-qrcode elements (hidden, used as fallback container) */
+#html5qr-container { position: absolute; inset: 0; display: none; }
+#html5qr-container video { width: 100% !important; height: 100% !important; object-fit: cover !important; }
 
 /* Result toast */
 .result-toast {
@@ -363,9 +392,21 @@ input[type="file"] { display: none; }
 <div class="scanner-overlay" id="scannerOverlay">
   <div class="scanner-header">
     <h2>Сканирование</h2>
-    <button class="scanner-close" onclick="stopScanner()">✕</button>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="scanner-close" onclick="showManualInput()" title="Ввести вручную" style="font-size:15px;">⌨️</button>
+      <button class="scanner-close" onclick="stopScanner()">✕</button>
+    </div>
   </div>
-  <div id="scanner-container"></div>
+  <div id="scanner-container">
+    <video id="scannerVideo" autoplay playsinline webkit-playsinline muted></video>
+    <div class="scan-region-highlight">
+      <div class="scan-line"></div>
+    </div>
+  </div>
+  <div class="manual-input" id="manualInput" style="display:none;">
+    <input type="text" id="manualCode" placeholder="Введите код (напр. OZN1831310669)" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+    <button onclick="submitManualCode()">OK</button>
+  </div>
   <div class="result-toast" id="resultToast">
     <div class="result-number" id="resultNumber"></div>
     <div class="result-name" id="resultName"></div>
@@ -795,102 +836,184 @@ function escHtml(s) {
 }
 
 // ===================== BARCODE SCANNER =====================
+let videoStream = null;
+let scannerAnimFrame = null;
+let nativeBarcodeDetector = null;
+let html5Scanner = null;
+let scannerMode = 'none'; // 'native', 'html5', 'none'
+
+function hasBarcodeDetector() {
+  return typeof BarcodeDetector !== 'undefined';
+}
+
 async function startScanner() {
   initAudio();
   const overlay = document.getElementById('scannerOverlay');
   overlay.classList.add('active');
   isScanning = true;
+  document.getElementById('manualInput').style.display = 'none';
 
-  try {
-    // Pass supported formats to constructor for reliable detection
-    const formatsToSupport = [
-      Html5QrcodeSupportedFormats.CODE_128,
-      Html5QrcodeSupportedFormats.EAN_13,
-      Html5QrcodeSupportedFormats.EAN_8,
-      Html5QrcodeSupportedFormats.CODE_39,
-      Html5QrcodeSupportedFormats.CODE_93,
-      Html5QrcodeSupportedFormats.ITF,
-      Html5QrcodeSupportedFormats.CODABAR
-    ];
-
-    scanner = new Html5Qrcode('scanner-container', {
-      formatsToSupport: formatsToSupport,
-      verbose: false
-    });
-
-    // Use facingMode instead of cameraId — much more reliable on iOS
-    const cameraConfig = { facingMode: "environment" };
-
-    await scanner.start(
-      cameraConfig,
-      {
-        fps: 10,
-        qrbox: function(vw, vh) {
-          // Wide rectangle for barcode scanning
-          const w = Math.floor(Math.min(vw, vh) * 0.9);
-          const h = Math.floor(w * 0.4);
-          return { width: w, height: h };
-        },
-        disableFlip: false,
-        experimentalFeatures: {
-          useBarCodeDetectorIfSupported: true  // Use native BarcodeDetector API on iOS 15.4+
-        }
-      },
-      onScanSuccess,
-      () => {} // ignore scan errors silently
-    );
-  } catch (err) {
-    console.error('Scanner error:', err);
-    // Fallback: try without facingMode constraint (front camera as last resort)
+  // Strategy 1: Native BarcodeDetector + getUserMedia (best for iOS 16.4+)
+  if (hasBarcodeDetector()) {
     try {
-      const cameras = await Html5Qrcode.getCameras();
-      if (cameras && cameras.length > 0) {
-        await scanner.start(
-          cameras[cameras.length - 1].id, // last camera is usually back
-          {
-            fps: 10,
-            qrbox: function(vw, vh) {
-              const w = Math.floor(Math.min(vw, vh) * 0.9);
-              const h = Math.floor(w * 0.4);
-              return { width: w, height: h };
-            },
-            experimentalFeatures: {
-              useBarCodeDetectorIfSupported: true
-            }
-          },
-          onScanSuccess,
-          () => {}
-        );
-      } else {
-        alert('Камера не найдена. Проверьте разрешения.');
-        stopScanner();
-      }
-    } catch (err2) {
-      alert('Ошибка камеры: ' + (err2.message || err2) + '\n\nУбедитесь, что:\n1. Сайт открыт по HTTPS\n2. Разрешён доступ к камере');
-      stopScanner();
+      await startNativeScanner();
+      return;
+    } catch (e) {
+      console.warn('Native BarcodeDetector failed:', e);
     }
+  }
+
+  // Strategy 2: html5-qrcode library
+  try {
+    await startHtml5Scanner();
+    return;
+  } catch (e) {
+    console.warn('html5-qrcode failed:', e);
+  }
+
+  // Strategy 3: Manual fallback
+  alert('Не удалось запустить камеру.\nИспользуйте ручной ввод кода (кнопка ⌨️).');
+  showManualInput();
+}
+
+async function startNativeScanner() {
+  scannerMode = 'native';
+  const video = document.getElementById('scannerVideo');
+  video.style.display = 'block';
+
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: { ideal: 'environment' },
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+      focusMode: { ideal: 'continuous' }
+    },
+    audio: false
+  });
+
+  videoStream = stream;
+  video.srcObject = stream;
+  await video.play();
+
+  nativeBarcodeDetector = new BarcodeDetector({
+    formats: ['code_128', 'ean_13', 'ean_8', 'code_39', 'code_93', 'itf', 'codabar']
+  });
+
+  // Scan loop
+  async function scanFrame() {
+    if (!isScanning || scannerMode !== 'native') return;
+    try {
+      if (video.readyState >= 2) {
+        const barcodes = await nativeBarcodeDetector.detect(video);
+        for (const barcode of barcodes) {
+          if (barcode.rawValue) {
+            await onScanSuccess(barcode.rawValue);
+            break;
+          }
+        }
+      }
+    } catch (e) { /* ignore frame errors */ }
+    scannerAnimFrame = requestAnimationFrame(scanFrame);
+  }
+  scannerAnimFrame = requestAnimationFrame(scanFrame);
+}
+
+async function startHtml5Scanner() {
+  scannerMode = 'html5';
+  // Hide native video, show html5-qrcode container
+  document.getElementById('scannerVideo').style.display = 'none';
+
+  // Create container if needed
+  let container = document.getElementById('html5qr-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'html5qr-container';
+    document.getElementById('scanner-container').appendChild(container);
+  }
+  container.style.display = 'block';
+
+  const formatsToSupport = [
+    Html5QrcodeSupportedFormats.CODE_128,
+    Html5QrcodeSupportedFormats.EAN_13,
+    Html5QrcodeSupportedFormats.EAN_8,
+    Html5QrcodeSupportedFormats.CODE_39
+  ];
+
+  html5Scanner = new Html5Qrcode('html5qr-container', {
+    formatsToSupport: formatsToSupport,
+    verbose: false
+  });
+
+  await html5Scanner.start(
+    { facingMode: "environment" },
+    {
+      fps: 10,
+      qrbox: (vw, vh) => ({
+        width: Math.floor(Math.min(vw, vh) * 0.85),
+        height: Math.floor(Math.min(vw, vh) * 0.35)
+      }),
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+    },
+    onScanSuccess,
+    () => {}
+  );
+}
+
+function showManualInput() {
+  const mi = document.getElementById('manualInput');
+  mi.style.display = mi.style.display === 'none' ? 'flex' : 'none';
+  if (mi.style.display === 'flex') {
+    document.getElementById('manualCode').focus();
+  }
+}
+
+function submitManualCode() {
+  const input = document.getElementById('manualCode');
+  const code = input.value.trim();
+  if (code) {
+    onScanSuccess(code);
+    input.value = '';
   }
 }
 
 async function stopScanner() {
   isScanning = false;
-  const overlay = document.getElementById('scannerOverlay');
-  overlay.classList.remove('active');
-  hideResultToast();
+  scannerMode = 'none';
 
-  if (scanner) {
-    try {
-      await scanner.stop();
-      scanner.clear();
-    } catch (e) {}
-    scanner = null;
+  // Stop native scanner
+  if (scannerAnimFrame) {
+    cancelAnimationFrame(scannerAnimFrame);
+    scannerAnimFrame = null;
   }
+  if (videoStream) {
+    videoStream.getTracks().forEach(t => t.stop());
+    videoStream = null;
+  }
+  const video = document.getElementById('scannerVideo');
+  if (video) {
+    video.srcObject = null;
+  }
+
+  // Stop html5-qrcode
+  if (html5Scanner) {
+    try {
+      await html5Scanner.stop();
+      html5Scanner.clear();
+    } catch (e) {}
+    html5Scanner = null;
+  }
+  const h5c = document.getElementById('html5qr-container');
+  if (h5c) h5c.style.display = 'none';
+
+  document.getElementById('scannerOverlay').classList.remove('active');
+  document.getElementById('manualInput').style.display = 'none';
+  hideResultToast();
 }
 
 async function onScanSuccess(code) {
-  // Debounce: ignore same code within 2.5 seconds
+  // Debounce: ignore same code within 2 seconds
   const now = Date.now();
-  if (code === lastScannedCode && now - lastScanTime < 2500) return;
+  if (code === lastScannedCode && now - lastScanTime < 2000) return;
   lastScannedCode = code;
   lastScanTime = now;
 
@@ -899,61 +1022,76 @@ async function onScanSuccess(code) {
     navigator.vibrate(100);
   }
 
-  // Find item
+  // Find items with this code
   const matchedItems = items.filter(i => i.code === code);
 
   if (matchedItems.length > 0) {
-    const alreadyScanned = matchedItems[0].scanned;
+    // Find first UNSCANNED item with this code
+    const unscannedItem = matchedItems.find(i => !i.scanned);
+    const totalWithCode = matchedItems.length;
+    const scannedWithCode = matchedItems.filter(i => i.scanned).length;
 
-    // Mark all items with this code as scanned
-    for (const item of matchedItems) {
-      if (!item.scanned) {
-        item.scanned = true;
-        scannedSet.add(item.code);
-        await dbPut('items', item);
-      }
-    }
+    if (unscannedItem) {
+      // Mark only THIS ONE item as scanned
+      unscannedItem.scanned = true;
+      await dbPut('items', unscannedItem);
 
-    // Show first match info
-    const item = matchedItems[0];
-    const nums = matchedItems.map(i => i.num).join(', ');
+      const newScannedCount = scannedWithCode + 1;
 
-    showResultToast(true, {
-      number: matchedItems.length > 1 ? `#${nums}` : `#${item.num}`,
-      name: item.name,
-      code: code,
-      already: alreadyScanned,
-      count: matchedItems.length
-    });
-
-    if (alreadyScanned) {
-      playDuplicate();
-    } else {
+      showResultToast(true, {
+        number: `#${unscannedItem.num}`,
+        name: unscannedItem.name,
+        code: code,
+        already: false,
+        count: totalWithCode > 1 ? `${newScannedCount} из ${totalWithCode}` : null
+      });
       playSuccess();
+
+      // Log scan
+      const scan = {
+        tableId: currentTableId,
+        code: code,
+        found: true,
+        itemNum: String(unscannedItem.num),
+        itemName: unscannedItem.name,
+        time: new Date().toISOString(),
+        device: settings.deviceName || getDeviceId()
+      };
+      await dbPut('scans', scan);
+      scanHistory.unshift(scan);
+      syncToSheets(scan);
+
+    } else {
+      // All items with this code are already scanned
+      showResultToast(true, {
+        number: `#${matchedItems[0].num}`,
+        name: matchedItems[0].name,
+        code: code,
+        already: true,
+        count: totalWithCode > 1 ? `все ${totalWithCode} уже собраны` : null
+      });
+      playDuplicate();
+
+      const scan = {
+        tableId: currentTableId,
+        code: code,
+        found: true,
+        itemNum: matchedItems.map(i => i.num).join(','),
+        itemName: matchedItems[0].name + ' (повтор)',
+        time: new Date().toISOString(),
+        device: settings.deviceName || getDeviceId()
+      };
+      await dbPut('scans', scan);
+      scanHistory.unshift(scan);
+      syncToSheets(scan);
     }
-
-    // Log scan
-    const scan = {
-      tableId: currentTableId,
-      code: code,
-      found: true,
-      itemNum: nums,
-      itemName: item.name,
-      time: new Date().toISOString(),
-      device: settings.deviceName || getDeviceId()
-    };
-    await dbPut('scans', scan);
-    scanHistory.unshift(scan);
-
-    // Sync to Google Sheets
-    syncToSheets(scan);
 
     updateStats();
     renderTable(document.getElementById('searchBar').value);
     renderHistory();
 
   } else {
-    // Not found
+    // Not found at all
     showResultToast(false, { code: code });
     playError();
     if (settings.vibration && navigator.vibrate) {
@@ -984,9 +1122,14 @@ function showResultToast(success, data) {
     document.getElementById('resultNumber').textContent = data.number;
     document.getElementById('resultName').textContent = data.name;
     document.getElementById('resultCode').textContent = data.code;
-    document.getElementById('resultAlready').textContent =
-      data.already ? '⚠️ Уже было отсканировано ранее' :
-      (data.count > 1 ? `✓ Найдено в ${data.count} позициях` : '');
+    let extra = '';
+    if (data.already) {
+      extra = '⚠️ Уже отсканировано';
+      if (data.count) extra += ` (${data.count})`;
+    } else if (data.count) {
+      extra = `✓ Собрано ${data.count}`;
+    }
+    document.getElementById('resultAlready').textContent = extra;
   } else {
     document.getElementById('resultNumber').textContent = '⛔';
     document.getElementById('resultName').textContent = 'Товар отсутствует в заявке';
@@ -1156,27 +1299,9 @@ document.addEventListener('touchstart', function initTouch() {
   document.removeEventListener('touchstart', initTouch);
 }, { once: true });
 
-// iOS video fix: ensure playsinline attribute on dynamically created video elements
-const videoObserver = new MutationObserver((mutations) => {
-  mutations.forEach(m => {
-    m.addedNodes.forEach(node => {
-      if (node.tagName === 'VIDEO') {
-        node.setAttribute('playsinline', 'true');
-        node.setAttribute('webkit-playsinline', 'true');
-        node.setAttribute('muted', 'true');
-      }
-      if (node.querySelectorAll) {
-        node.querySelectorAll('video').forEach(v => {
-          v.setAttribute('playsinline', 'true');
-          v.setAttribute('webkit-playsinline', 'true');
-          v.setAttribute('muted', 'true');
-        });
-      }
-    });
-  });
-});
-videoObserver.observe(document.getElementById('scanner-container'), {
-  childList: true, subtree: true
+// Enter key for manual input
+document.getElementById('manualCode').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') submitManualCode();
 });
 
 // Init
