@@ -1,4 +1,4 @@
-const CACHE_NAME = 'warehouse-scanner-v4';
+const CACHE_NAME = 'warehouse-scanner-v5';
 const ASSETS = [
   './',
   './index.html',
