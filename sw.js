@@ -1,11 +1,12 @@
-const CACHE_NAME = 'warehouse-scanner-v1';
+const CACHE_NAME = 'warehouse-scanner-v2';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './icon.svg',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
-  'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js'
+  'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
+  'https://unpkg.com/@AstoriaZ/zxing-browser@0.1.7/umd/index.min.js'
 ];
 
 self.addEventListener('install', (event) => {
