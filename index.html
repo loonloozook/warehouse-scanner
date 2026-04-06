@@ -114,8 +114,12 @@ input[type="file"] { display: none; }
   background: transparent; color: white; font-size: 20px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
 }
-#scanner-container { flex: 1; position: relative; overflow: hidden; }
+#scanner-container { flex: 1; position: relative; overflow: hidden; background: #000; }
 #scanner-container video { width: 100% !important; height: 100% !important; object-fit: cover !important; }
+#scanner-container img { display: none !important; }
+/* Fix html5-qrcode canvas/shaded region on iOS */
+#scanner-container > div { width: 100% !important; height: 100% !important; }
+#qr-shaded-region { border-color: rgba(233, 69, 96, 0.5) !important; }
 
 /* Result toast */
 .result-toast {
@@ -798,52 +802,73 @@ async function startScanner() {
   isScanning = true;
 
   try {
-    scanner = new Html5Qrcode('scanner-container');
-    const cameras = await Html5Qrcode.getCameras();
-    if (!cameras || cameras.length === 0) {
-      alert('Камера не найдена');
-      stopScanner();
-      return;
-    }
+    // Pass supported formats to constructor for reliable detection
+    const formatsToSupport = [
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.CODE_93,
+      Html5QrcodeSupportedFormats.ITF,
+      Html5QrcodeSupportedFormats.CODABAR
+    ];
 
-    // Prefer back camera
-    let cameraId = cameras[0].id;
-    for (const cam of cameras) {
-      if (cam.label.toLowerCase().includes('back') ||
-          cam.label.toLowerCase().includes('задн') ||
-          cam.label.toLowerCase().includes('rear') ||
-          cam.label.toLowerCase().includes('environment')) {
-        cameraId = cam.id;
-        break;
-      }
-    }
+    scanner = new Html5Qrcode('scanner-container', {
+      formatsToSupport: formatsToSupport,
+      verbose: false
+    });
+
+    // Use facingMode instead of cameraId — much more reliable on iOS
+    const cameraConfig = { facingMode: "environment" };
 
     await scanner.start(
-      cameraId,
+      cameraConfig,
       {
-        fps: 15,
+        fps: 10,
         qrbox: function(vw, vh) {
-          const min = Math.min(vw, vh);
-          return { width: Math.floor(min * 0.85), height: Math.floor(min * 0.35) };
+          // Wide rectangle for barcode scanning
+          const w = Math.floor(Math.min(vw, vh) * 0.9);
+          const h = Math.floor(w * 0.4);
+          return { width: w, height: h };
         },
-        aspectRatio: window.innerHeight / window.innerWidth,
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.CODE_93,
-          Html5QrcodeSupportedFormats.ITF,
-          Html5QrcodeSupportedFormats.CODABAR
-        ]
+        disableFlip: false,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true  // Use native BarcodeDetector API on iOS 15.4+
+        }
       },
       onScanSuccess,
-      () => {} // ignore scan errors
+      () => {} // ignore scan errors silently
     );
   } catch (err) {
     console.error('Scanner error:', err);
-    alert('Ошибка камеры: ' + (err.message || err));
-    stopScanner();
+    // Fallback: try without facingMode constraint (front camera as last resort)
+    try {
+      const cameras = await Html5Qrcode.getCameras();
+      if (cameras && cameras.length > 0) {
+        await scanner.start(
+          cameras[cameras.length - 1].id, // last camera is usually back
+          {
+            fps: 10,
+            qrbox: function(vw, vh) {
+              const w = Math.floor(Math.min(vw, vh) * 0.9);
+              const h = Math.floor(w * 0.4);
+              return { width: w, height: h };
+            },
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true
+            }
+          },
+          onScanSuccess,
+          () => {}
+        );
+      } else {
+        alert('Камера не найдена. Проверьте разрешения.');
+        stopScanner();
+      }
+    } catch (err2) {
+      alert('Ошибка камеры: ' + (err2.message || err2) + '\n\nУбедитесь, что:\n1. Сайт открыт по HTTPS\n2. Разрешён доступ к камере');
+      stopScanner();
+    }
   }
 }
 
@@ -1130,6 +1155,29 @@ document.addEventListener('touchstart', function initTouch() {
   initAudio();
   document.removeEventListener('touchstart', initTouch);
 }, { once: true });
+
+// iOS video fix: ensure playsinline attribute on dynamically created video elements
+const videoObserver = new MutationObserver((mutations) => {
+  mutations.forEach(m => {
+    m.addedNodes.forEach(node => {
+      if (node.tagName === 'VIDEO') {
+        node.setAttribute('playsinline', 'true');
+        node.setAttribute('webkit-playsinline', 'true');
+        node.setAttribute('muted', 'true');
+      }
+      if (node.querySelectorAll) {
+        node.querySelectorAll('video').forEach(v => {
+          v.setAttribute('playsinline', 'true');
+          v.setAttribute('webkit-playsinline', 'true');
+          v.setAttribute('muted', 'true');
+        });
+      }
+    });
+  });
+});
+videoObserver.observe(document.getElementById('scanner-container'), {
+  childList: true, subtree: true
+});
 
 // Init
 (async function init() {
